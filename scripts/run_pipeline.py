@@ -104,6 +104,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Run the investor-network GCN pipeline.")
     p.add_argument("--config", type=Path, default=PROJECT_ROOT / "configs" / "config.yaml")
     p.add_argument("--quick", action="store_true", help="Smoke test with small universe and few epochs.")
+    p.add_argument("--medium", action="store_true", help="Medium run (~5-10 min, 200 stocks x 1000 days).")
     p.add_argument("--skip-gcn", action="store_true", help="Skip the GCN model (baselines only).")
     p.add_argument("--no-ablation", action="store_true", help="Skip ablation studies.")
     return p.parse_args()
@@ -119,6 +120,11 @@ def main() -> int:
         cfg["data"]["n_days"] = 600
         cfg["training"]["gcn"]["epochs"] = 20
         cfg["training"]["baseline"]["mlp"]["epochs"] = 10
+    elif args.medium:
+        cfg["data"]["n_stocks"] = 200
+        cfg["data"]["n_days"] = 1000
+        cfg["training"]["gcn"]["epochs"] = 60
+        cfg["training"]["baseline"]["mlp"]["epochs"] = 40
 
     set_seed(cfg["data"]["seed"])
     paths = Paths.from_root(PROJECT_ROOT).ensure()
