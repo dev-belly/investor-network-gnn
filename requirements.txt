@@ -1,0 +1,35 @@
+# Core scientific stack
+numpy>=1.26,<3.0
+pandas>=2.2,<3.0
+scipy>=1.13,<2.0
+
+# Graph & network
+networkx>=3.3,<4.0
+python-louvain>=0.16  # community detection
+
+# Machine learning
+scikit-learn>=1.4,<2.0
+xgboost>=2.0,<3.0
+
+# Deep learning + GNN
+torch>=2.2,<3.0
+torch-geometric>=2.5,<3.0
+
+# Visualization
+matplotlib>=3.8,<4.0
+seaborn>=0.13,<1.0
+
+# Experiment management & utilities
+pyyaml>=6.0,<7.0
+tqdm>=4.66,<5.0
+joblib>=1.3,<2.0
+pyarrow>=15.0  # parquet I/O
+
+# Optional: real A-share data interfaces (comment in if you have Tushare token)
+# tushare>=1.4
+# akshare>=1.13
+
+# Dev / docs
+pytest>=8.0
+jupyter>=1.0
+ipykernel>=6.29

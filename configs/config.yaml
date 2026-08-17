@@ -1,0 +1,65 @@
+# Configurations for the pipeline
+data:
+  n_stocks: 300                  # simulated HS300 size
+  n_days: 1500                   # ~6 years of trading days
+  n_industries: 27               # SW industry classification
+  start_date: "2018-01-01"
+  seed: 42
+
+graph:
+  threshold:
+    quantiles: [0.7, 0.8, 0.9]   # correlation thresholds to test
+  knn:
+    k_values: [5, 10, 20]
+  industry:
+    use_prior: true
+  fund_holding:
+    overlap_quantile: 0.85
+
+features:
+  return_windows: [5, 20, 60, 120]      # days
+  volatility_windows: [20, 60]
+  momentum_windows: [20, 60, 120, 250]
+  fundamental_n: 8                       # synthetic fundamental factors
+
+label:
+  horizon: 20                            # forward return window in days
+  upper_quantile: 0.5                    # binary: top half vs bottom half
+  risk_quantiles: [0.2, 0.8]             # low / mid / high realized-volatility regime
+
+split:
+  train_ratio: 0.6
+  val_ratio: 0.15
+  test_ratio: 0.25
+  purge_gap: 5                           # days between train/val/test to avoid leakage
+
+training:
+  baseline:
+    xgb:
+      n_estimators: 400
+      max_depth: 5
+      learning_rate: 0.05
+      subsample: 0.8
+      colsample_bytree: 0.8
+    mlp:
+      hidden_dims: [128, 64]
+      dropout: 0.3
+      lr: 0.001
+      epochs: 80
+      batch_size: 1024
+  gcn:
+    hidden_dims: [64, 32]
+    dropout: 0.4
+    lr: 0.001
+    epochs: 120
+    weight_decay: 0.0005
+    patience: 15
+
+ablation:
+  edge_drop_rates: [0.0, 0.25, 0.5, 0.75, 0.9]
+  randomize_graph: true
+  feature_ablation_groups:
+    - ["return", "volatility", "momentum"]
+    - ["fundamental"]
+    - ["network_stat"]
+    - ["all"]
