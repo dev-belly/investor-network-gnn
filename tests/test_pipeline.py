@@ -183,7 +183,10 @@ def test_labels_balance(tiny_universe):
 # -----------------------------------------------------------------------------#
 def test_chronological_split_purge_gap():
     dates = pd.bdate_range("2020-01-01", periods=300)
-    split = chronological_split(dates, train_ratio=0.6, val_ratio=0.2, test_ratio=0.2, purge_gap=5)
+    split = chronological_split(
+        dates, train_ratio=0.6, val_ratio=0.2, test_ratio=0.2,
+        purge_gap=5, label_horizon=5,
+    )
     # train and val should not overlap
     assert split.train[1] < split.val[0]
     # purge_gap should be respected

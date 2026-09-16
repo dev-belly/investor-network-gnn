@@ -1,5 +1,10 @@
 # Investor Network GCN — Experiment Report
 
+> Historical synthetic-data output, retained without recalculating metrics.
+> This report predates the fix for the 5-trading-date purge gap with 20-day
+> forward labels. Its model metrics and ablations have not been rerun with the
+> corrected split and must not be used as evidence of post-fix performance.
+
 ## 1. Test-set metrics
 
 | Model | n | AUC | Brier | ECE | Top-10 hit | Long-Short |

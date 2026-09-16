@@ -31,7 +31,7 @@ split:
   train_ratio: 0.6
   val_ratio: 0.15
   test_ratio: 0.25
-  purge_gap: 5                           # days between train/val/test to avoid leakage
+  purge_gap: 20                          # omitted trading dates; must be >= label.horizon
 
 training:
   baseline:

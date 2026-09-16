@@ -151,6 +151,7 @@ def main() -> int:
         val_ratio=cfg["split"]["val_ratio"],
         test_ratio=cfg["split"]["test_ratio"],
         purge_gap=cfg["split"]["purge_gap"],
+        label_horizon=cfg["label"]["horizon"],
     )
     log.info("  train=%s..%s  val=%s..%s  test=%s..%s",
              split.train[0].date(), split.train[1].date(),
