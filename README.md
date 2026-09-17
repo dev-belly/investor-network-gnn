@@ -2,12 +2,10 @@
 
 > **独立研究项目 · 2026.08 至今 · 复杂网络 · 金融大数据**
 >
-> 基于沪深 300 成分股滚动收益相关性与共同基金持仓关系构建股票网络，
-> 比较阈值图 / k 近邻图 / 行业先验图；先建立 LR / XGBoost / 无图 MLP
-> 基线，再加入中心性、社区标签等网络统计特征；最后用轻量 GCN 比较图结构
-> 对未来收益相对表现与风险预测的增量价值。单次时间切分 + AUC /
-> 校准误差 / 分行业表现 / 市场阶段漂移；通过边移除、随机化图结构与特征
-> 消融，识别模型收益究竟来自网络关系还是普通横截面特征。
+> 使用合成 HS300 风格股票的历史收益相关性与模拟基金持仓构建股票网络，
+> 比较 LR / XGBoost / 无图 MLP / GCN 的未来 20 日相对收益分类表现。
+> 单次时间切分按标签期限隔离；报告所有预先选定种子与同一 checkpoint 的
+> 测试图边移除实验。当前三种子结果没有显示稳定的 GCN 排序优势。
 
 本仓库是该项目的**可复现工程实现**：合成数据、特征工程、图构建、四种
 模型（LR / XGBoost / MLP / GCN）、消融实验、可视化与可下载的实验报告
@@ -22,12 +20,12 @@
 | 数据 | 合成 300 只 HS300 风格股票 × 1500 日 × 27 个申万行业；含基金持仓网络 |
 | 节点特征 | 23 列：多窗口收益 / 波动率 / 动量 / 偏度 / 峰度 / 9 个财务因子 |
 | 图构建 | **阈值图** / **k 近邻图** / **行业先验图** / **共同基金持仓图** / 并集 |
-| 网络统计 | 度 / 中心性 / PageRank / 集聚系数 / k-core / Louvain 社区 |
+| 网络统计 | 已计算用于图诊断；当前 23 列模型输入不含网络统计量 |
 | 基线 | Logistic Regression · XGBoost · 无图 MLP（BatchNorm + GELU + Dropout） |
 | GNN | 自实现 GCN（2 层 + 边权重的 Kipf-Welling 归一化） |
 | 评估 | AUC / Brier / ECE / Top-10 命中率 / 多空十等分收益 / 分行业 / 分市场阶段 |
-| 消融 | 特征组消融 · 边 drop 曲线 · 图随机化（degree-preserving swap） |
-| 工程 | 时间切分 + purge gap；MPS / CUDA 自适应；MLflow-ready；纯 numpy 输出 |
+| 已执行消融 | 特征组消融 · 同一 checkpoint 的测试图边 drop 曲线 |
+| 工程 | 标签期限隔离；CPU / CUDA；逐行预测、checkpoint、配置与数据哈希；CI 快测 |
 
 ---
 
@@ -100,12 +98,13 @@ cd investor-network-gnn
 # 2. 准备 Python 环境（Python 3.10+）
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install "torch>=2.2,<3" --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements-test.txt
 
-# 3. 跑一遍 smoke test（约 30 秒）
+# 3. 跑 quick 研究配置
 python scripts/run_pipeline.py --quick
 
-# 4. 跑完整实验（约 3-5 分钟，CPU；MPS / CUDA 更快）
+# 4. 默认 300 × 1500 规模（本轮未运行；全批 GCN 需要更多内存）
 python scripts/run_pipeline.py
 ```
 
@@ -130,7 +129,7 @@ outputs/
 │   ├── 05_metrics_bar.png             AUC / Brier / ECE / 长短收益 条形
 │   ├── 06_per_industry_auc.png       27 个行业 × 4 模型 AUC
 │   ├── 07_per_regime_auc.png          牛 / 熊 / 震荡市 AUC
-│   ├── 08_gcn_long_short.png          GCN 多空累计收益曲线
+│   ├── 08_gcn_long_short.png          逐日期前瞻期多空收益差（非净值）
 │   ├── 09_edge_drop_curve.png         边 drop 比例 vs AUC
 │   └── 10_xgb_feature_importance.png  XGBoost Top-20 重要性
 └── reports/
@@ -205,48 +204,51 @@ outputs/
   隔离前的分区，随后从验证集和测试集开头各移除默认 20 个交易日期。
   切分器接收标签期限，要求 `purge_gap >= label_horizon`，并检查隔离后各分区
   仍有足够样本。旧版本使用未来 20 日标签却仅隔离 5 日，边界标签窗口会重叠。
-  该边界问题已修复并加入轻量回归测试；下方历史模型结果尚未按新切分重算。
+  该边界问题已修复并加入回归测试；下方三种子 quick 已按新切分完整重算。
 - **优化**：AdamW + cosine schedule，MLP 训 80 epoch、GCN 训 120 epoch
   带早停（patience 15）。
 - **指标**：
   - AUC（方向预测）
   - Brier score + ECE（概率校准）
-  - Top-10% 命中率（precision at 10%）
-  - 多空十等分日度收益（long top decile, short bottom decile）
+  - Top-10% 正收益比例：预测排名前 10% 股票中，未来 20 日收益为正的比例；它不等同于 `y_dir` 分类精度，也没有固定 0.5 随机基准
+  - 逐信号日前瞻 20 日多空收益差（long top decile, short bottom decile）；窗口相互重叠，不能逐日复利解释为组合净值
   - 分行业 / 分市场阶段切片
 
 ### 5.6 消融研究
 
-1. **特征组消融**：依次剔除收益-波动率组 / 基本面 / 动量 / 网络统计特征
-2. **边 drop 曲线**：固定 GCN，逐级随机移除 0% / 25% / 50% / 75% / 90% 的边
-3. **图随机化**：用 `nx.double_edge_swap` 替换为度序列保持但边连接随机的
-   图（degree-preserving 配置模型），看 GCN 是否还比 MLP 强
+1. **特征组消融**：剔除收益-波动率组 / 基本面 / 动量；当前 `no_network_stat` 与完整输入均为 23 列，是保留的空消融，不能证明网络特征没有作用
+2. **边 drop 曲线**：复用主比较中经验证集选择的同一 GCN checkpoint，仅移除测试图的 0% / 25% / 50% / 75% / 90% 边；不重新训练，0% 行必须复现主比较 AUC
+3. **图随机化（待接入实验）**：`randomize_graph` 工具函数已实现，但默认 pipeline 未调用；本轮未运行，不纳入实证结论
 4. **市场阶段漂移**：在 bull / bear / sideways 三段分别评估
 
 ---
 
-## 6. 复现实验结果（quick 模式示例）
+## 6. 三种子复现实验（2026-09-17）
 
-下面保留仓库已提交的 [实验报告](outputs/reports/results.md) 中的历史合成数据
-结果，原记录标注为 `--quick` 模式（80 只股票 / 600 日）。这些数值不是本次重跑
-结果，来自修复前的切分；不能据此推断修复后的模型表现或完整规模实验优势。
+完整执行 `--quick`（80 只股票 × 600 日，GCN 20 epochs、MLP 10 epochs），
+预先固定种子 42、43、44，均含四模型、特征消融和同一 checkpoint 的测试图边移除。
+每次测试集为 95 个信号日、7,600 行。下表展示全部运行，未选择性保留种子。
 
-| Model | AUC | Brier | ECE | Top-10 hit | Long-Short |
-|---|---|---|---|---|---|
-| LogReg | 0.504 | 0.252 | 0.049 | 0.517 | -0.004 |
-| XGBoost | 0.492 | 0.330 | 0.238 | 0.490 | -0.003 |
-| MLP-no-graph | 0.515 | 0.261 | 0.089 | 0.504 | 0.007 |
-| **GCN** | **0.574** | **0.249** | **0.017** | **0.591** | **0.027** |
+| Model | Seed 42 AUC | Seed 43 AUC | Seed 44 AUC | 均值 ± 样本标准差 |
+|---|---:|---:|---:|---:|
+| LogReg | 0.5085 | 0.5078 | 0.4874 | 0.5012 ± 0.0120 |
+| XGBoost | 0.5013 | 0.4520 | 0.5073 | 0.4869 ± 0.0304 |
+| MLP-no-graph | 0.5080 | 0.4989 | 0.4802 | 0.4957 ± 0.0142 |
+| GCN | 0.5402 | 0.4439 | 0.5162 | 0.5001 ± 0.0501 |
 
-* 该历史报告的主比较中，GCN AUC 高于 MLP，但这不足以证明图结构带来稳定增益。
-* 同一报告的 edge-drop 实验在移除 0% 边时记录 AUC=0.4863，与主比较的
-  GCN AUC=0.5744 不同。应先核对训练过程与评估口径，再解释边消融结果。
-* `y_dir` 表示未来 20 日收益是否高于当日股票横截面中位数。因此 Top-10
-  命中率约 0.59 指选中股票中约 59% 跑赢该中位数，不等于约 59% 获得正收益。
+GCN 相对 MLP 的 AUC 差为 `+0.0322 / −0.0550 / +0.0360`，均值 `+0.0044`。
+GCN 平均 AUC 约 0.5001，跨种子波动明显，**当前证据不支持稳定的图模型排序优势**。
+三个种子不足以给出显著性结论；模型容量和训练预算也未匹配。
 
-当前结果仅描述**合成数据**实验。真实 A 股表现尚未验证；真实数据接入还需要
-处理历史成分股、财务及基金持仓披露日期、数据质量和标签可得性，不能仅靠替换
-文件确认方法有效。
+![Three-seed results and fixed-checkpoint ablation](experiments/2026-09-17/benchmark.png)
+
+- [实验说明与复现命令](experiments/2026-09-17/README.md)
+- [全部指标 CSV](experiments/2026-09-17/metrics.csv) · [机器可读汇总 JSON](experiments/2026-09-17/summary.json)
+- 已从保存的逐行预测独立复算 60 个指标，全部误差不超过 `1e-12`；三次 0% 边移除 AUC 均与主比较完全一致。
+- 旧版结果单独保留为[历史记录](outputs/reports/historical-pre-fix.md)，不能用于解释修复后的表现。
+
+当前均为合成数据，真实 A 股和默认 300 × 1500 规模尚未验证。真实数据还需核验
+历史成分股、财务和基金持仓披露日期；静态模拟持仓不能代表真实历史可得性。
 
 ---
 
@@ -254,8 +256,7 @@ outputs/
 
 **Q: 我可以换成 PyG 的 GCNConv 吗？**
 A: 可以。`src/models/gcn.py` 里已经留了 `PyGGCNClassifier`（需要
-`pip install torch-geometric`），直接换 import 即可；两个实现都遵循
-Kipf-Welling 2017 的归一化，结果应一致。
+`pip install torch-geometric`）；该可选后端尚未做本轮等价性验证，需要单独核对归一化、自环和预测。
 
 **Q: 跑得很慢怎么办？**
 A: 改 `configs/config.yaml`：
@@ -277,6 +278,8 @@ A: `src/training/plots.py` 的 `_set_cjk_font()` 会按平台自动选
 
 ## 8. 后续扩展（Roadmap）
 
+- [ ] 在匹配容量与训练预算后，扩展种子和市场时间窗口
+- [ ] 接入并实跑度序列保持的图随机化对照
 - [ ] 接入 Tushare / AkShare 一键拉真实数据
 - [ ] 用 GraphSAGE / GAT 替换 GCN（处理不同邻居重要性）
 - [ ] 加入 temporal GNN（TGN / DyRep）捕捉图动态

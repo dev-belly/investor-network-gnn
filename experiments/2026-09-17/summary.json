@@ -1,0 +1,336 @@
+{
+  "seeds": [
+    42,
+    43,
+    44
+  ],
+  "data_source": "synthetic",
+  "verification": "60 metrics independently recomputed from saved predictions; all within 1e-12; each zero-drop AUC equals main GCN AUC",
+  "per_seed_metrics": [
+    {
+      "seed": 42,
+      "model": "LogReg",
+      "auc": 0.508526592797784,
+      "brier": 0.25144628486166065,
+      "ece": 0.04507426856770454,
+      "top_hit": 0.5210526315789473,
+      "long_short": -0.0035081832099806403
+    },
+    {
+      "seed": 42,
+      "model": "XGBoost",
+      "auc": 0.5012863227146814,
+      "brier": 0.3282805383205414,
+      "ece": 0.23266282536285487,
+      "top_hit": 0.48947368421052634,
+      "long_short": -0.00022481188047018862
+    },
+    {
+      "seed": 42,
+      "model": "MLP-no-graph",
+      "auc": 0.507979743767313,
+      "brier": 0.2641584575176239,
+      "ece": 0.10698331203115614,
+      "top_hit": 0.5092105263157894,
+      "long_short": 0.003989245573935744
+    },
+    {
+      "seed": 42,
+      "model": "GCN",
+      "auc": 0.5402220914127424,
+      "brier": 0.2495027631521225,
+      "ece": 0.018306252685816714,
+      "top_hit": 0.5355263157894737,
+      "long_short": 0.012199951683426457
+    },
+    {
+      "seed": 43,
+      "model": "LogReg",
+      "auc": 0.507758864265928,
+      "brier": 0.25221849350503184,
+      "ece": 0.0395446994153587,
+      "top_hit": 0.5565789473684211,
+      "long_short": 0.005915924735639878
+    },
+    {
+      "seed": 43,
+      "model": "XGBoost",
+      "auc": 0.4519627077562327,
+      "brier": 0.3045929968357086,
+      "ece": 0.2004105719825939,
+      "top_hit": 0.4986842105263158,
+      "long_short": -0.00782582147353572
+    },
+    {
+      "seed": 43,
+      "model": "MLP-no-graph",
+      "auc": 0.4988876731301939,
+      "brier": 0.25240033864974976,
+      "ece": 0.051660954289530436,
+      "top_hit": 0.5263157894736842,
+      "long_short": 0.0037311755108950374
+    },
+    {
+      "seed": 43,
+      "model": "GCN",
+      "auc": 0.4439037396121884,
+      "brier": 0.2538639008998871,
+      "ece": 0.03431848358166843,
+      "top_hit": 0.5447368421052632,
+      "long_short": -0.007299335054199125
+    },
+    {
+      "seed": 44,
+      "model": "LogReg",
+      "auc": 0.4874236842105263,
+      "brier": 0.25827383430885775,
+      "ece": 0.06991420917395774,
+      "top_hit": 0.5697368421052632,
+      "long_short": -0.022179777698231005
+    },
+    {
+      "seed": 44,
+      "model": "XGBoost",
+      "auc": 0.5073078601108033,
+      "brier": 0.2986888885498047,
+      "ece": 0.19743169860130078,
+      "top_hit": 0.6118421052631579,
+      "long_short": -0.003364925751191969
+    },
+    {
+      "seed": 44,
+      "model": "MLP-no-graph",
+      "auc": 0.4801659279778393,
+      "brier": 0.2617838680744171,
+      "ece": 0.07631198547388376,
+      "top_hit": 0.5828947368421052,
+      "long_short": -0.01992051748718043
+    },
+    {
+      "seed": 44,
+      "model": "GCN",
+      "auc": 0.5161503808864266,
+      "brier": 0.24984435737133026,
+      "ece": 0.011214477215942605,
+      "top_hit": 0.5460526315789473,
+      "long_short": 0.012396479961741867
+    }
+  ],
+  "aggregate": {
+    "LogReg": {
+      "auc": {
+        "mean": 0.501236380424746,
+        "sample_sd": 0.011968303317697042
+      },
+      "brier": {
+        "mean": 0.25397953755851677,
+        "sample_sd": 0.003738959077365822
+      },
+      "ece": {
+        "mean": 0.051511059052340324,
+        "sample_sd": 0.016175629340206023
+      },
+      "top_hit": {
+        "mean": 0.5491228070175439,
+        "sample_sd": 0.025183995122729157
+      },
+      "long_short": {
+        "mean": -0.006590678724190589,
+        "sample_sd": 0.014299246754969226
+      }
+    },
+    "XGBoost": {
+      "auc": {
+        "mean": 0.48685229686057246,
+        "sample_sd": 0.030364902421306614
+      },
+      "brier": {
+        "mean": 0.31052080790201825,
+        "sample_sd": 0.015661118799973464
+      },
+      "ece": {
+        "mean": 0.21016836531558317,
+        "sample_sd": 0.019537629622581418
+      },
+      "top_hit": {
+        "mean": 0.5333333333333333,
+        "sample_sd": 0.06814637848925183
+      },
+      "long_short": {
+        "mean": -0.0038051863683992923,
+        "sample_sd": 0.0038195822764755813
+      }
+    },
+    "MLP-no-graph": {
+      "auc": {
+        "mean": 0.49567778162511544,
+        "sample_sd": 0.014182018184957873
+      },
+      "brier": {
+        "mean": 0.2594475547472636,
+        "sample_sd": 0.006217484201808708
+      },
+      "ece": {
+        "mean": 0.07831875059819011,
+        "sample_sd": 0.02771572020029793
+      },
+      "top_hit": {
+        "mean": 0.5394736842105262,
+        "sample_sd": 0.038564081288823285
+      },
+      "long_short": {
+        "mean": -0.004066698800783216,
+        "sample_sd": 0.01373041606234959
+      }
+    },
+    "GCN": {
+      "auc": {
+        "mean": 0.5000920706371191,
+        "sample_sd": 0.05012692110474252
+      },
+      "brier": {
+        "mean": 0.2510703404744466,
+        "sample_sd": 0.0024253157610070893
+      },
+      "ece": {
+        "mean": 0.021279737827809248,
+        "sample_sd": 0.01183553919152451
+      },
+      "top_hit": {
+        "mean": 0.5421052631578948,
+        "sample_sd": 0.005735393346764011
+      },
+      "long_short": {
+        "mean": 0.0057656988636563995,
+        "sample_sd": 0.01131507796248355
+      }
+    }
+  },
+  "gcn_minus_mlp_auc": {
+    "per_seed": {
+      "42": 0.032242347645429326,
+      "43": -0.05498393351800551,
+      "44": 0.03598445290858732
+    },
+    "mean": 0.00441428901200371,
+    "sample_sd": 0.05147438652129339
+  },
+  "evidence": [
+    {
+      "seed": 42,
+      "test_rows": 7600,
+      "test_dates": 95,
+      "predictions_sha256": "03ac74102e3015c87a0ee5f788c542c98766ecca71a990772ec3d57cf4b250e0",
+      "provenance": {
+        "source_revision": "c904e46254c0754a622f34da9a00eaec339143dc",
+        "source_sha256": "0403b8987946a3b46fb44ab918582cc2e9b5939d1872155afd7327345a62842e",
+        "python": "3.12.13",
+        "packages": {
+          "numpy": "2.5.2",
+          "pandas": "2.3.3",
+          "scikit-learn": "1.9.0",
+          "torch": "2.13.0",
+          "xgboost": "2.1.4",
+          "networkx": "3.6.1"
+        },
+        "checkpoint_sha256": "1f0c6cf8ce6812e13a899e2d1e5eafb518310c7e5c991a63d12c7ba9b41dfb17",
+        "data_sha256": {
+          "fund_holdings.parquet": "75df6d8fa2fd5e5a65ab22399accb5dfe704fac4190c792a910e5177f4312697",
+          "fundamentals.parquet": "ebca8d9d7195c891901b6e163b22a8a6961efa01ec41503e553df4428126f250",
+          "market_regime.parquet": "c77ba6d2b6f6539a23e0945ee6625f9ee4a6ebb94e4ee4ab139768bf40fba507",
+          "prices.parquet": "69c2b1466716a403b1010f3b0fd8e63c5ad18da0e31d1ea0c99d6c36937ab5f5",
+          "returns.parquet": "fb4cbae9fe3a2d9a2e6fe603a520e9419c330bd35d3da03b50dca0ce3d24bde6",
+          "stock_industry.parquet": "7fcbb20f3bbe9c3b593432540a8ff31571e8b8535fa8480450fa20e9eb443fb1"
+        },
+        "protocol": "single chronological split; horizon-purged; validation-selected fixed GCN checkpoint; inference-only edge removal"
+      },
+      "edge_drop_auc": {
+        "0.0": 0.5402220914127424,
+        "0.25": 0.5425609418282549,
+        "0.5": 0.5289235110803324,
+        "0.75": 0.5284541551246538,
+        "0.9": 0.5258337603878116
+      }
+    },
+    {
+      "seed": 43,
+      "test_rows": 7600,
+      "test_dates": 95,
+      "predictions_sha256": "9a5a96d0e79e3c050df24f0eebee8aac32f375e62d9fd5baa0f3c4f7b6fdae46",
+      "provenance": {
+        "source_revision": "c904e46254c0754a622f34da9a00eaec339143dc",
+        "source_sha256": "0403b8987946a3b46fb44ab918582cc2e9b5939d1872155afd7327345a62842e",
+        "python": "3.12.13",
+        "packages": {
+          "numpy": "2.5.2",
+          "pandas": "2.3.3",
+          "scikit-learn": "1.9.0",
+          "torch": "2.13.0",
+          "xgboost": "2.1.4",
+          "networkx": "3.6.1"
+        },
+        "checkpoint_sha256": "4392b251c0193ea63877e0ed63f5cfb0d06b052c2eb7398f0a534b3054992562",
+        "data_sha256": {
+          "fund_holdings.parquet": "dffad27ea9e88bc2975c3ac55132cd9d69570e6a60b708b8fcc1fd5534eb5399",
+          "fundamentals.parquet": "e499c9397392e72e4df6d01d2dc899826eeac76fbbb25432de45d34ff1acbb81",
+          "market_regime.parquet": "0accd08a465b6659ff3c30315dbf60d35fd1e893a8152e043aab6834139bdc8c",
+          "prices.parquet": "dd722943a85dc4a743febe129ee96ebfdd5c50c2f307e6f1e711fa7948332247",
+          "returns.parquet": "1b16be2e8bde7b0450e405f206b2ae4a965b45437cd502fdb6c2f084bdf5296a",
+          "stock_industry.parquet": "1665327a26bacc3badc8b8d2cb1bcbd3f5a25077a4b14bcc351a3ac08bb965ce"
+        },
+        "protocol": "single chronological split; horizon-purged; validation-selected fixed GCN checkpoint; inference-only edge removal"
+      },
+      "edge_drop_auc": {
+        "0.0": 0.4439037396121884,
+        "0.25": 0.44961866343490303,
+        "0.5": 0.43938885041551246,
+        "0.75": 0.4445520775623269,
+        "0.9": 0.43554892659279776
+      }
+    },
+    {
+      "seed": 44,
+      "test_rows": 7600,
+      "test_dates": 95,
+      "predictions_sha256": "ed4c240083b0ca0d9dcea1e81f21fba57453edfb44ad24f28ba2c319dfa262b0",
+      "provenance": {
+        "source_revision": "c904e46254c0754a622f34da9a00eaec339143dc",
+        "source_sha256": "0403b8987946a3b46fb44ab918582cc2e9b5939d1872155afd7327345a62842e",
+        "python": "3.12.13",
+        "packages": {
+          "numpy": "2.5.2",
+          "pandas": "2.3.3",
+          "scikit-learn": "1.9.0",
+          "torch": "2.13.0",
+          "xgboost": "2.1.4",
+          "networkx": "3.6.1"
+        },
+        "checkpoint_sha256": "d3c58d528973cef325070debba96cc6867fec895967c3158c9184f05f0d9b41c",
+        "data_sha256": {
+          "fund_holdings.parquet": "d24bae8ac3a655c51266d766c301a467fb3d10d7552adc8df1c58757a0e3e6f6",
+          "fundamentals.parquet": "454d1d692f64fdc6a8f0d51038997f1df6db2b2eee007585fcf6af238b651e69",
+          "market_regime.parquet": "e0886f5494dceb68333058107670dd644302b1b8c9ef3510ee61747c9c4af603",
+          "prices.parquet": "cba82be8739b305c7fbe709f7f94786d9ee9a12d45eb6326135250f8e4855240",
+          "returns.parquet": "11c35fe901e89f0565fdbbc8da322c024d5c8c496b9298a6d0ef0c0a4af2fde2",
+          "stock_industry.parquet": "bec488f85bfdacce000b12b08aab8fd78c2fa527905c97d9c132fd951c8c3d09"
+        },
+        "protocol": "single chronological split; horizon-purged; validation-selected fixed GCN checkpoint; inference-only edge removal"
+      },
+      "edge_drop_auc": {
+        "0.0": 0.5161503808864266,
+        "0.25": 0.5106021468144044,
+        "0.5": 0.5102152700831025,
+        "0.75": 0.5004733379501385,
+        "0.9": 0.49941024930747924
+      }
+    }
+  ],
+  "limitations": [
+    "Three synthetic seeds, not real-market evidence or a significance test",
+    "MLP and GCN architectures/training budgets differ",
+    "No degree-preserving randomization experiment was run",
+    "Network statistics are not model inputs; no_network_stat ablation is a no-op",
+    "Overlapping 20-day horizon spreads are not a portfolio NAV",
+    "Default 300-stock/1500-day training was not run"
+  ]
+}
