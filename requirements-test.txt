@@ -1,0 +1,13 @@
+# CPU torch is installed separately in CI; no PyG or notebook extras required.
+numpy>=1.26,<3
+pandas>=2.2,<3
+scipy>=1.13,<2
+networkx>=3.3,<4
+python-louvain>=0.16
+scikit-learn>=1.4,<2
+xgboost>=2,<3
+matplotlib>=3.8,<4
+seaborn>=0.13,<1
+pyyaml>=6,<7
+pyarrow>=15
+pytest>=8,<9

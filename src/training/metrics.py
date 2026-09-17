@@ -41,7 +41,7 @@ def compute_ece(y_true: np.ndarray, p: np.ndarray, n_bins: int = 10) -> float:
     bins = np.linspace(0.0, 1.0, n_bins + 1)
     ece = 0.0
     for lo, hi in zip(bins[:-1], bins[1:]):
-        mask = (p > lo) & (p <= hi)
+        mask = ((p >= lo) if lo == 0 else (p > lo)) & (p <= hi)
         if mask.sum() == 0:
             continue
         acc = y_true[mask].mean()

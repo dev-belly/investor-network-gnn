@@ -1,0 +1,88 @@
+# Bounded CI smoke; not a research benchmark.
+data:
+  n_stocks: 30
+  n_days: 400
+  n_industries: 6
+  start_date: '2018-01-01'
+  seed: 42
+graph:
+  threshold:
+    quantiles:
+    - 0.7
+    - 0.8
+    - 0.9
+  knn:
+    k_values:
+    - 5
+    - 10
+    - 20
+  industry:
+    use_prior: true
+  fund_holding:
+    overlap_quantile: 0.85
+features:
+  return_windows:
+  - 5
+  - 20
+  - 60
+  - 120
+  volatility_windows:
+  - 20
+  - 60
+  momentum_windows:
+  - 20
+  - 60
+  - 120
+  - 250
+  fundamental_n: 8
+label:
+  horizon: 20
+  upper_quantile: 0.5
+  risk_quantiles:
+  - 0.2
+  - 0.8
+split:
+  train_ratio: 0.6
+  val_ratio: 0.15
+  test_ratio: 0.25
+  purge_gap: 20
+training:
+  baseline:
+    xgb:
+      n_estimators: 20
+      max_depth: 5
+      learning_rate: 0.05
+      subsample: 0.8
+      colsample_bytree: 0.8
+    mlp:
+      hidden_dims:
+      - 128
+      - 64
+      dropout: 0.3
+      lr: 0.001
+      epochs: 2
+      batch_size: 1024
+  gcn:
+    hidden_dims:
+    - 8
+    - 4
+    dropout: 0.4
+    lr: 0.001
+    epochs: 2
+    weight_decay: 0.0005
+    patience: 15
+ablation:
+  edge_drop_rates:
+  - 0.0
+  - 0.25
+  - 0.5
+  - 0.75
+  - 0.9
+  randomize_graph: true
+  feature_ablation_groups:
+  - - return
+    - volatility
+    - momentum
+  - - fundamental
+  - - network_stat
+  - - all

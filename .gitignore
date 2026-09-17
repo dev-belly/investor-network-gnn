@@ -47,3 +47,7 @@ secrets.yaml
 # Logs
 *.log
 logs/
+.ci-smoke/
+experiments/**/data/
+experiments/**/outputs/figures/
+experiments/**/outputs/models/

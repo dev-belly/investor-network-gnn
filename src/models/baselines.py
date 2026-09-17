@@ -51,6 +51,7 @@ def fit_xgboost(
     learning_rate: float = 0.05,
     subsample: float = 0.8,
     colsample_bytree: float = 0.8,
+    random_state: int = 42,
 ) -> XGBClassifier:
     log.info(
         "Fitting XGBoost (n_est=%d, depth=%d, lr=%.3f) ...",
@@ -67,7 +68,7 @@ def fit_xgboost(
         tree_method="hist",
         n_jobs=2,
         eval_metric="logloss",
-        random_state=42,
+        random_state=random_state,
     )
     model.fit(X_train, y_train)
     return model

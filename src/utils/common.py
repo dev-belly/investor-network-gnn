@@ -98,10 +98,21 @@ class Paths:
 
 
 def save_json(obj: Any, path: str | Path) -> None:
+    def clean(value):
+        if isinstance(value, dict):
+            return {key: clean(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [clean(item) for item in value]
+        if isinstance(value, (float, np.floating)) and not np.isfinite(value):
+            return None
+        if isinstance(value, np.generic):
+            return value.item()
+        return value
+
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False, indent=2, default=str)
+        json.dump(clean(obj), f, ensure_ascii=False, indent=2, default=str, allow_nan=False)
 
 
 def load_json(path: str | Path) -> Any:

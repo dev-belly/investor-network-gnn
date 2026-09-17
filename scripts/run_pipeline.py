@@ -9,7 +9,11 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import hashlib
+import importlib.metadata
 import json
+import platform
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -107,6 +111,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--medium", action="store_true", help="Medium run (~5-10 min, 200 stocks x 1000 days).")
     p.add_argument("--skip-gcn", action="store_true", help="Skip the GCN model (baselines only).")
     p.add_argument("--no-ablation", action="store_true", help="Skip ablation studies.")
+    p.add_argument("--seed", type=int, help="Override the data and model random seed.")
+    p.add_argument("--run-dir", type=Path, help="Isolated directory for this run's data and outputs.")
+    p.add_argument("--force-data", action="store_true", help="Regenerate synthetic data in the run directory.")
     return p.parse_args()
 
 
@@ -114,6 +121,9 @@ def main() -> int:
     args = parse_args()
     setup_logging()
     cfg = load_config(args.config)
+    if args.seed is not None:
+        cfg["data"]["seed"] = args.seed
+    cfg["training"]["baseline"]["xgb"]["random_state"] = cfg["data"]["seed"]
 
     if args.quick:
         cfg["data"]["n_stocks"] = 80
@@ -127,14 +137,14 @@ def main() -> int:
         cfg["training"]["baseline"]["mlp"]["epochs"] = 40
 
     set_seed(cfg["data"]["seed"])
-    paths = Paths.from_root(PROJECT_ROOT).ensure()
+    paths = Paths.from_root(args.run_dir or PROJECT_ROOT).ensure()
     log.info("Pipeline starting (project_root=%s, quick=%s)", PROJECT_ROOT, args.quick)
 
     # ------------------------------------------------------------------ #
     # 1) Load (or generate) the universe
     # ------------------------------------------------------------------ #
     log.info("[1/8] Loading universe ...")
-    data = load_or_generate(paths.data_raw, cfg)
+    data = load_or_generate(paths.data_raw, cfg, force=args.force_data)
     bundle = data.bundle
     panel = data.panel
     feature_names = data.feature_names
@@ -279,9 +289,10 @@ def main() -> int:
         if not args.no_ablation:
             log.info("[6/8] Edge-drop ablation ...")
             edge_drop_curve = gcn_edge_drop_curve(
-                test, test_snaps, train, val,
-                train_snaps, val_snaps, stock_ids, feature_names, cfg,
+                gcn_model, test, test_snaps, stock_ids, feature_names, cfg,
             )
+            if 0.0 in edge_drop_curve and not np.isclose(edge_drop_curve[0.0], gcn_res.auc, atol=1e-12):
+                raise RuntimeError("Zero-drop AUC differs from the main GCN evaluation")
     else:
         log.info("[4-6/8] Skipping GCN per --skip-gcn")
 
@@ -378,16 +389,34 @@ def main() -> int:
     # 8) Save JSON + Markdown report
     # ------------------------------------------------------------------ #
     log.info("Saving reports ...")
+    predictions = test[["y_dir", "fwd_ret"]].copy()
+    for name, probs in probs_dict.items():
+        predictions[name] = probs
+    predictions.to_parquet(paths.reports / "test_predictions.parquet")
+    checkpoint_hash = None
+    if gcn_res is not None:
+        import torch
+        checkpoint_path = paths.models / "gcn.pt"
+        torch.save(gcn_model.state_dict(), checkpoint_path)
+        checkpoint_hash = hashlib.sha256(checkpoint_path.read_bytes()).hexdigest()
+    source_hash = hashlib.sha256()
+    for source_path in sorted(list((PROJECT_ROOT / "src").rglob("*.py")) + list((PROJECT_ROOT / "scripts").glob("*.py"))):
+        source_hash.update(str(source_path.relative_to(PROJECT_ROOT)).encode())
+        source_hash.update(source_path.read_bytes())
     summary = {
+        "provenance": {
+            "source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, text=True).strip(),
+            "source_sha256": source_hash.hexdigest(),
+            "python": platform.python_version(),
+            "packages": {name: importlib.metadata.version(name) for name in ["numpy", "pandas", "scikit-learn", "torch", "xgboost", "networkx"]},
+            "checkpoint_sha256": checkpoint_hash,
+            "data_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths.data_raw.glob("*.parquet"))},
+            "protocol": "single chronological split; horizon-purged; validation-selected fixed GCN checkpoint; inference-only edge removal",
+        },
         "models": [r.to_dict() for r in eval_results],
         "ablations": {k: {"n_feat": len(v[0]), "metrics": v[1].to_dict()} for k, v in ablations.items()},
         "edge_drop_ablation": {str(k): v for k, v in edge_drop_curve.items()},
-        "config": {
-            "data": cfg["data"],
-            "graph": cfg["graph"],
-            "split": cfg["split"],
-            "training": cfg["training"],
-        },
+        "config": cfg,
         "panel_shape": list(panel.shape),
     }
     save_json(summary, paths.reports / "results.json")

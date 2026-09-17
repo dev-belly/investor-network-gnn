@@ -294,35 +294,29 @@ def feature_ablation_study(
 
 
 def gcn_edge_drop_curve(
+    model: object,
     test_panel: pd.DataFrame,
     test_snapshots: dict,
-    train_panel: pd.DataFrame,
-    val_panel: pd.DataFrame,
-    train_snapshots: dict,
-    val_snapshots: dict,
     stock_ids: list[str],
     feature_cols: list[str],
     cfg: dict,
     *,
     drop_rates: list[float] | None = None,
 ) -> dict[float, float]:
-    """Train once, then evaluate the same model against test graphs that have
-    had progressively more edges removed."""
+    """Evaluate the supplied, validation-selected checkpoint without retraining.
+
+    Only inference graph edges change. In particular, zero edge removal is
+    the same model, rows and graph as the main test-set evaluation.
+    """
     if drop_rates is None:
         drop_rates = cfg["ablation"]["edge_drop_rates"]
     res_auc: dict[float, float] = {}
-    # Re-use already trained model
-    res, model, _ = train_gcn(
-        train_panel, val_panel, test_panel,
-        train_snapshots, val_snapshots, test_snapshots,
-        feature_cols, stock_ids, cfg,
-    )
     import numpy as np
-    Xt, yt, ei_t, ew_t, _ = _snapshots_to_arrays(train_panel, train_snapshots, stock_ids, feature_cols)
     Xe, ye, ei_e, ew_e, _ = _snapshots_to_arrays(test_panel, test_snapshots, stock_ids, feature_cols)
     import torch
-    rng = np.random.default_rng(cfg["data"]["seed"])
     for dr in drop_rates:
+        # A rate's random draw is independent of the order of requested rates.
+        rng = np.random.default_rng(np.random.SeedSequence([cfg["data"]["seed"], int(dr * 10000)]))
         ei2, ew2 = random_drop_edges(ei_e.numpy(), ew_e.numpy(), float(dr), rng=rng)
         ei2 = torch.tensor(ei2, dtype=torch.long)
         ew2 = torch.tensor(ew2, dtype=torch.float32)
