@@ -1,6 +1,6 @@
 # Bounded CI smoke; not a research benchmark.
 data:
-  n_stocks: 30
+  n_stocks: 80
   n_days: 400
   n_industries: 6
   start_date: '2018-01-01'
