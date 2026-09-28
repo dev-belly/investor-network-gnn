@@ -41,3 +41,4 @@ jobs:
       - run: python -m pip install -r requirements-test.txt
       - run: python -m pytest tests/ -q
       - run: python scripts/run_pipeline.py --config configs/smoke.yaml --force-data --run-dir .ci-smoke
+      - run: python experiments/2026-09-28/summarize.py

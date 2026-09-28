@@ -1,0 +1,51 @@
+{
+  "panel_shape": [
+    36480,
+    26
+  ],
+  "n_features": 23,
+  "feature_names": [
+    "momentum_20d",
+    "momentum_60d",
+    "momentum_120d",
+    "momentum_250d",
+    "ret_mean_5d",
+    "ret_mean_20d",
+    "ret_mean_60d",
+    "ret_mean_120d",
+    "vol_20d",
+    "vol_60d",
+    "abs_ret_5d",
+    "abs_ret_20d",
+    "skew_20d",
+    "kurt_20d",
+    "log_market_cap",
+    "beta",
+    "roe",
+    "asset_growth",
+    "leverage",
+    "pe_ttm",
+    "pb",
+    "earnings_yield",
+    "turnover"
+  ],
+  "split": {
+    "train": [
+      "2018-06-22T00:00:00",
+      "2019-07-09T00:00:00"
+    ],
+    "val": [
+      "2019-08-07T00:00:00",
+      "2019-10-11T00:00:00"
+    ],
+    "test": [
+      "2019-11-11T00:00:00",
+      "2020-03-20T00:00:00"
+    ]
+  },
+  "train_size": 21840,
+  "val_size": 3840,
+  "test_size": 7600,
+  "universe_size": 80,
+  "n_industries": 25
+}

@@ -1,5 +1,8 @@
 # Three-seed synthetic benchmark · 2026-09-17
 
+> 历史结果：本次实验早于 2026-09-28 的图节点顺序与边权修复。
+> 下面的数值仅用于追溯旧实现；请以[修复后的三种子复算](../2026-09-28/README.md)解释当前代码表现。
+
 本次完整执行预先选定的 42、43、44 三个种子；没有按结果筛选种子。GCN 平均 AUC 为 **0.5001**，相对 MLP 的平均差为 **+0.0044**，跨种子差异明显，不能据此认定图结构带来稳定预测增益。
 
 ![All seeds and fixed-checkpoint edge ablation](benchmark.png)

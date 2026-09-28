@@ -223,7 +223,7 @@ outputs/
 
 ---
 
-## 6. 三种子复现实验（2026-09-17）
+## 6. 三种子复现实验（2026-09-28，图构建修复后）
 
 完整执行 `--quick`（80 只股票 × 600 日，GCN 20 epochs、MLP 10 epochs），
 预先固定种子 42、43、44，均含四模型、特征消融和同一 checkpoint 的测试图边移除。
@@ -234,16 +234,18 @@ outputs/
 | LogReg | 0.5085 | 0.5078 | 0.4874 | 0.5012 ± 0.0120 |
 | XGBoost | 0.5013 | 0.4520 | 0.5073 | 0.4869 ± 0.0304 |
 | MLP-no-graph | 0.5080 | 0.4989 | 0.4802 | 0.4957 ± 0.0142 |
-| GCN | 0.5402 | 0.4439 | 0.5162 | 0.5001 ± 0.0501 |
+| GCN | 0.5402 | 0.4439 | 0.5181 | 0.5008 ± 0.0505 |
 
-GCN 相对 MLP 的 AUC 差为 `+0.0322 / −0.0550 / +0.0360`，均值 `+0.0044`。
-GCN 平均 AUC 约 0.5001，跨种子波动明显，**当前证据不支持稳定的图模型排序优势**。
+GCN 相对 MLP 的 AUC 差为 `+0.0322 / −0.0550 / +0.0380`，均值 `+0.0051`。
+GCN 平均 AUC 约 0.5008，跨种子波动明显，**当前证据不支持稳定的图模型排序优势**。
 三个种子不足以给出显著性结论；模型容量和训练预算也未匹配。
+此次修复对齐了基金持仓和行业边的股票顺序，避免有效边在等权情况下被归零；
+旧实验[保留为修复前记录](experiments/2026-09-17/README.md)，上表依据修复后的逐行预测重新计算。
 
-![Three-seed results and fixed-checkpoint ablation](experiments/2026-09-17/benchmark.png)
+![Three-seed results and fixed-checkpoint ablation](experiments/2026-09-28/benchmark.png)
 
-- [实验说明与复现命令](experiments/2026-09-17/README.md)
-- [全部指标 CSV](experiments/2026-09-17/metrics.csv) · [机器可读汇总 JSON](experiments/2026-09-17/summary.json)
+- [实验说明与复现命令](experiments/2026-09-28/README.md)
+- [全部指标 CSV](experiments/2026-09-28/metrics.csv) · [机器可读汇总 JSON](experiments/2026-09-28/summary.json)
 - 已从保存的逐行预测独立复算 60 个指标，全部误差不超过 `1e-12`；三次 0% 边移除 AUC 均与主比较完全一致。
 - 旧版结果单独保留为[历史记录](outputs/reports/historical-pre-fix.md)，不能用于解释修复后的表现。
 
