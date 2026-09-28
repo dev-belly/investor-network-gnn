@@ -15,7 +15,6 @@ from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
-from scipy.stats import rankdata
 
 
 # -----------------------------------------------------------------------------#
@@ -112,6 +111,9 @@ def threshold_graph(
     else:
         w = (weights - thr) / max(1e-9, 1.0 - thr)
     w = np.clip(w, 0.0, 1.0)
+    if np.any(weights > 0) and not np.any(w > 0):
+        # Equal positive correlations still represent real graph links.
+        w = np.ones_like(w)
     w = np.concatenate([w, w])
     return edge_index.astype(np.int64), w.astype(np.float32)
 
@@ -146,8 +148,11 @@ def knn_graph(
     edge_index = np.stack([np.array(edge_src), np.array(edge_dst)], axis=0)
     edge_w = np.array(edge_w, dtype=np.float32)
     edge_index, edge_w = symmetrize(edge_index, edge_w)
-    if edge_w.max() > 0:
-        edge_w = (edge_w - edge_w.min()) / max(1e-9, edge_w.max() - edge_w.min())
+    if edge_w.max() > edge_w.min():
+        edge_w = (edge_w - edge_w.min()) / (edge_w.max() - edge_w.min())
+    elif edge_w.max() > 0:
+        # A uniform positive correlation must still transmit messages.
+        edge_w = np.ones_like(edge_w)
     return edge_index.astype(np.int64), edge_w.astype(np.float32)
 
 
@@ -156,8 +161,7 @@ def industry_prior_graph(
     intra_industry_weight: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Industry prior: edges connect every pair within the same industry."""
-    stock_industry = stock_industry.sort_index()
-    n = len(stock_industry)
+    # Node positions must retain the order supplied by the returns panel.
     src = []
     dst = []
     for industry, group in stock_industry.groupby(stock_industry):
@@ -183,6 +187,7 @@ def fund_holding_graph(
     fund_holdings: pd.DataFrame,
     n_stocks: int,
     overlap_quantile: float = 0.85,
+    stock_ids: Sequence[str] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Build a graph connecting stocks frequently co-held by funds.
 
@@ -195,18 +200,17 @@ def fund_holding_graph(
         fund_holdings.assign(w=fund_holdings["weight"])
         .pivot_table(index="fund_id", columns="stock_id", values="w", fill_value=0.0)
     )
+    if stock_ids is None:
+        raise ValueError("stock_ids are required to align holdings with graph nodes")
+    ordered_ids = list(stock_ids)
+    if len(ordered_ids) != n_stocks or len(set(ordered_ids)) != n_stocks:
+        raise ValueError("stock_ids must contain each graph node exactly once")
+    # Pivot sorts its columns and omits stocks with no fund holding; both
+    # would otherwise make the resulting edge positions refer to wrong nodes.
+    pivot = pivot.reindex(columns=ordered_ids, fill_value=0.0)
     # Co-occurrence matrix: dot product of indicators
-    indicator = (pivot > 0).astype(np.int8)
+    indicator = (pivot > 0).astype(np.int32)
     co = indicator.values.T @ indicator.values  # (n_stocks_used, n_stocks_used)
-    used_stocks = list(pivot.columns)
-    if len(used_stocks) < n_stocks:
-        # Pad to full universe with zeros
-        new_co = np.zeros((n_stocks, n_stocks), dtype=np.int32)
-        id_map = {s: i for i, s in enumerate(used_stocks)}
-        for i_s, s_i in enumerate(used_stocks):
-            for j_s, s_j in enumerate(used_stocks):
-                new_co[id_map[s_i], id_map[s_j]] = co[i_s, j_s]
-        co = new_co
 
     np.fill_diagonal(co, 0)
     # threshold by quantile
@@ -220,8 +224,12 @@ def fund_holding_graph(
     src = np.concatenate([rows, cols])
     dst = np.concatenate([cols, rows])
     weights = co[rows, cols].astype(np.float32)
-    if weights.max() > 0:
-        weights = (weights - weights.min()) / max(1e-9, weights.max() - weights.min())
+    if weights.max() > weights.min():
+        weights = (weights - weights.min()) / (weights.max() - weights.min())
+    else:
+        # With one edge (or equal overlap counts), min-max scaling would turn
+        # every real co-holding relation into a zero-weight edge.
+        weights = np.ones_like(weights)
     edge_index = np.stack([src, dst], axis=0)
     return edge_index.astype(np.int64), np.concatenate([weights, weights]).astype(np.float32)
 

@@ -70,11 +70,12 @@ def build_snapshot(
     if method in ("knn", "union"):
         knn_ei, knn_w = knn_graph(window, k=knn_k, use_absolute=True)
         graphs.append((knn_ei, knn_w))
-    if method in ("union", "industry", "fund"):
+    if method in ("union", "industry"):
         graphs.append((industry_ei, industry_w))
     if method in ("union", "fund"):
         fund_ei, fund_w = fund_holding_graph(
-            fund_holdings, n_stocks=n, overlap_quantile=fund_overlap_quantile
+            fund_holdings, n_stocks=n, overlap_quantile=fund_overlap_quantile,
+            stock_ids=stock_ids,
         )
         graphs.append((fund_ei, fund_w))
 
