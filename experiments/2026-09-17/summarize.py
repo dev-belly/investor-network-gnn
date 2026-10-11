@@ -24,7 +24,7 @@ MODELS = ["LogReg", "XGBoost", "MLP-no-graph", "GCN"]
 def strict_json(path):
     def reject(value):
         raise ValueError(f"Non-standard JSON number: {value}")
-    return json.loads(path.read_text(), parse_constant=reject)
+    return json.loads(path.read_text(encoding="utf-8"), parse_constant=reject)
 
 
 def independent_metrics(frame, model):
@@ -109,7 +109,9 @@ summary = {
     "evidence": evidence,
     "limitations": ["Three synthetic seeds, not real-market evidence or a significance test", "MLP and GCN architectures/training budgets differ", "No degree-preserving randomization experiment was run", "Network statistics are not model inputs; no_network_stat ablation is a no-op", "Overlapping 20-day horizon spreads are not a portfolio NAV", "Default 300-stock/1500-day training was not run"],
 }
-(ROOT / "summary.json").write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n")
+(ROOT / "summary.json").write_text(
+    json.dumps(summary, indent=2, allow_nan=False) + "\n", encoding="utf-8", newline=""
+)
 
 plt.rcParams.update({"font.size": 10, "figure.dpi": 160})
 fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
