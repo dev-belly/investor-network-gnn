@@ -6,6 +6,7 @@ import pytest
 
 from src.graphs.builders import fund_holding_graph, industry_prior_graph, knn_graph, threshold_graph
 from src.graphs.snapshots import build_snapshot
+from src.graphs.stats import network_statistics
 
 
 def undirected_pairs(edge_index):
@@ -84,3 +85,24 @@ def test_equal_positive_threshold_links_keep_nonzero_weight():
     edges, weights = threshold_graph(returns)
     assert undirected_pairs(edges) == {frozenset((0, 1))}
     assert (weights > 0).all()
+
+
+@pytest.mark.parametrize("builder", [knn_graph, threshold_graph])
+def test_undefined_correlations_do_not_invent_graph_links(builder):
+    returns = pd.DataFrame({"A": [0.0] * 4, "B": [0.0] * 4, "C": [0.0] * 4})
+    edges, weights = builder(returns)
+    assert edges.shape == (2, 0)
+    assert weights.shape == (0,)
+    stats = network_statistics(edges, weights, 3)
+    assert (stats["core_number"] == 0).all()
+
+
+@pytest.mark.parametrize("builder", [knn_graph, threshold_graph])
+def test_positive_correlation_mode_excludes_negative_links(builder):
+    returns = pd.DataFrame({"A": [1.0, 2.0, 3.0, 4.0], "B": [-1.0, -2.0, -3.0, -4.0]})
+    edges, weights = builder(returns, use_absolute=False)
+    assert edges.shape == (2, 0)
+    assert weights.shape == (0,)
+    absolute_edges, absolute_weights = builder(returns, use_absolute=True)
+    assert undirected_pairs(absolute_edges) == {frozenset((0, 1))}
+    assert (absolute_weights > 0).all()

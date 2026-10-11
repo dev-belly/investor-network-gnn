@@ -95,7 +95,9 @@ def threshold_graph(
     if len(off_diag) == 0:
         return np.zeros((2, 0), dtype=np.int64), np.zeros(0, dtype=np.float32)
     thr = np.quantile(off_diag, quantile)
-    mask = scores >= thr
+    # Undefined/zero correlation is absence of evidence, not a graph link.
+    # The signed mode promises positive relationships only.
+    mask = (scores >= thr) & (scores > 0)
     rows, cols = np.where(np.triu(mask, k=1))
     if len(rows) == 0:
         return np.zeros((2, 0), dtype=np.int64), np.zeros(0, dtype=np.float32)
@@ -138,7 +140,7 @@ def knn_graph(
     for i in range(n):
         top = np.argpartition(-scores[i], kth=min(k, n - 1))[:k]
         for j in top:
-            if i == j:
+            if i == j or scores[i, j] <= 0:
                 continue
             edge_src.append(i)
             edge_dst.append(j)
