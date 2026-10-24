@@ -12,12 +12,12 @@ import pandas as pd
 
 from src.data.features import attach_labels, compute_node_features, make_labels
 from src.data.synthetic import generate_universe
-from src.utils.common import get_logger, load_config, set_seed
+from src.utils.common import get_logger, set_seed
 
 log = get_logger(__name__)
 
 
-def load_or_generate(raw_dir: Path, cfg: dict, *, force: bool = False) -> "LoadedData":
+def load_or_generate(raw_dir: Path, cfg: dict, *, force: bool = False) -> LoadedData:
     """Return a :class:`LoadedData` bundle.
 
     If processed parquet files exist in ``raw_dir`` we re-use them; otherwise
@@ -94,7 +94,11 @@ class LoadedData:
     def feature_matrix(
         self, split_dates: dict[str, pd.Timestamp] | None = None
     ) -> tuple[pd.DataFrame, pd.DataFrame]:
-        """Return ``(X, y)``.  Optionally restrict to a date window."""
+        """Return feature-only ``X`` and separate labels ``y`` in the same row order.
+
+        Optionally restrict both frames to a date window. Future direction,
+        risk and return labels must never appear among the model inputs.
+        """
         cols = self.feature_names + ["y_dir", "y_risk", "fwd_ret"]
         df = self.panel[cols].copy()
         if split_dates is not None:
@@ -103,7 +107,7 @@ class LoadedData:
                 df = df[df.index.get_level_values("date") >= start]
             if end is not None:
                 df = df[df.index.get_level_values("date") <= end]
-        return df, df[["y_dir", "y_risk", "fwd_ret"]]
+        return df[self.feature_names].copy(), df[["y_dir", "y_risk", "fwd_ret"]].copy()
 
     def get_node_split(
         self, date: pd.Timestamp
