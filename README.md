@@ -68,7 +68,7 @@ investor-network-gnn/
 │   ├── reports/              # results.json / results.md / data_summary.json
 │   └── models/               # 训练好的模型权重
 ├── notebooks/                # （可选）探索用
-└── tests/                    # （可选）单元测试
+└── tests/                    # 时间切分、图协议与其他回归测试
 ```
 
 ---
@@ -93,6 +93,7 @@ investor-network-gnn/
 
 ```bash
 # 1. 克隆 / 进入项目
+git clone https://github.com/dev-belly/investor-network-gnn.git
 cd investor-network-gnn
 
 # 2. 准备 Python 环境（Python 3.10+）

@@ -1,0 +1,48 @@
+name: Bug report
+description: Report a reproducible problem in Investor Network GCN.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check existing issues and SUPPORT.md first. English or Chinese is welcome.
+        Do not post tokens, confidential data, personal information or exploit details. Follow SECURITY.md for vulnerabilities.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and revision
+      description: Include commit SHA, operating system, runtime and relevant package or browser versions.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the exact command, small configuration and synthetic or public input needed to reproduce the problem.
+      placeholder: |
+        Command:
+        Configuration and seed:
+        Data source:
+        Steps:
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Explain what should happen and what occurred. Include redacted errors or logs when useful.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Research or domain context
+      description: |
+        Include the config, seed, label horizon, purge gap, split dates, graph construction mode, backend and saved prediction/checkpoint identifiers. Preserve all preselected seeds and compare the same checkpoint when reporting test-edge removal.
+  - type: checkboxes
+    id: safe_to_publish
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked existing issues and removed credentials, personal information and confidential data.
+          required: true
