@@ -111,35 +111,56 @@ function csvHeading({ title, exportTitle, format: kind }) {
   return Object.hasOwn(units, kind) ? title + "（" + units[kind] + "）" : title;
 }
 
-function drawEdges(canvas, edges, points) {
+function drawEdges(canvas, edges, positions, institution, radius) {
+  const { width, height } = canvas.getBoundingClientRect();
+  if (width === 0 || height === 0) return;
+  const density = Math.min(window.devicePixelRatio || 1, 3);
+  const pixelsWide = Math.round(width * density);
+  const pixelsHigh = Math.round(height * density);
+  if (canvas.width !== pixelsWide) canvas.width = pixelsWide;
+  if (canvas.height !== pixelsHigh) canvas.height = pixelsHigh;
   const context = canvas.getContext("2d");
   if (!context) return;
-  for (const edge of edges) {
-    const source = points.get(edge.from);
-    const target = points.get(edge.to);
-    if (!source || !target) continue;
-    const angle = Math.atan2(target.y - source.y, target.x - source.x);
-    const dx = Math.cos(angle);
-    const dy = Math.sin(angle);
-    const offset = edge.reverse ? 8 : 0;
-    const stop = 43;
-    const x = target.x - dx * stop - dy * offset;
-    const y = target.y - dy * stop + dx * offset;
-    context.strokeStyle = edge.short ? "#a63d4a" : "#587981";
-    context.lineWidth = edge.short ? 4.1 : 3.2;
-    if (edge.short) context.setLineDash([12, 6]);
-    context.beginPath();
-    context.moveTo(source.x + dx * stop - dy * offset, source.y + dy * stop + dx * offset);
-    context.lineTo(x, y);
-    context.stroke();
-    context.setLineDash([]);
-    context.beginPath();
-    context.moveTo(x, y);
-    context.lineTo(x - dx * 13 - dy * 6, y - dy * 13 + dx * 6);
-    context.moveTo(x, y);
-    context.lineTo(x - dx * 13 + dy * 6, y - dy * 13 - dx * 6);
-    context.stroke();
+  context.setTransform(pixelsWide / width, 0, 0, pixelsHigh / height, 0, 0);
+  context.clearRect(0, 0, width, height);
+  context.lineJoin = "round";
+  context.lineCap = "round";
+  for (const emphasized of [false, true]) {
+    for (const edge of edges) {
+      const incident = edge.from === institution || edge.to === institution;
+      if (incident !== emphasized) continue;
+      const from = positions.get(edge.from);
+      const to = positions.get(edge.to);
+      if (!from || !to) continue;
+      const startX = from.x * width;
+      const startY = from.y * height;
+      const endX = to.x * width;
+      const endY = to.y * height;
+      const distance = Math.hypot(endX - startX, endY - startY);
+      const stop = radius + 4;
+      if (distance <= stop * 2) continue;
+      const dx = (endX - startX) / distance;
+      const dy = (endY - startY) / distance;
+      const offset = edge.reverse ? 5 : 0;
+      const x = endX - dx * stop - dy * offset;
+      const y = endY - dy * stop + dx * offset;
+      context.strokeStyle = edge.short ? "#f0a0a4" : "#dcf3ae";
+      context.globalAlpha = emphasized ? 1 : .54;
+      context.lineWidth = emphasized ? 2.15 : 1.45;
+      context.setLineDash(edge.short ? [6, 4] : []);
+      context.beginPath();
+      context.moveTo(startX + dx * stop - dy * offset, startY + dy * stop + dx * offset);
+      context.lineTo(x, y);
+      context.stroke();
+      context.setLineDash([]);
+      context.beginPath();
+      context.moveTo(x - dx * 7 - dy * 3, y - dy * 7 + dx * 3);
+      context.lineTo(x, y);
+      context.lineTo(x - dx * 7 + dy * 3, y - dy * 7 - dx * 3);
+      context.stroke();
+    }
   }
+  context.globalAlpha = 1;
 }
 
 function renderGraph(container, graph, institution, choose) {
@@ -151,17 +172,22 @@ function renderGraph(container, graph, institution, choose) {
   canvas.setAttribute("role", "img");
   canvas.setAttribute("aria-label", graph.summary);
   stage.append(canvas);
-  const points = new Map(graph.nodes.map((item) => [item.id, {
-    x: 67 + item.x * 826,
-    y: 52 + item.y * 360,
+  const positions = new Map(graph.nodes.map((item) => [item.id, {
+    x: (67 + item.x * 826) / 960,
+    y: (52 + item.y * 360) / 464,
   }]));
-  drawEdges(canvas, graph.edges, points);
 
   const readout = node("dl", "graph-readout");
   readout.setAttribute("aria-live", "polite");
   const status = { direct: "直接违约", cascade: "传染违约", solvent: "足额偿付" };
   const controls = new Map();
+  let currentInstitution;
+  function draw() {
+    const radius = controls.get(currentInstitution)?.getBoundingClientRect().width / 2 || 0;
+    drawEdges(canvas, graph.edges, positions, currentInstitution, radius);
+  }
   function selectInstitution(item) {
+    currentInstitution = item.id;
     for (const [id, control] of controls) {
       control.setAttribute("aria-pressed", String(id === item.id));
     }
@@ -176,13 +202,14 @@ function renderGraph(container, graph, institution, choose) {
       term.append(node("dt", null, label), node("dd", null, value));
       return term;
     }));
+    draw();
   }
   for (const item of graph.nodes) {
-    const { x, y } = points.get(item.id);
+    const { x, y } = positions.get(item.id);
     const control = button(item.id, "graph-node");
     control.dataset.status = item.status;
-    control.style.left = 100 * x / canvas.width + "%";
-    control.style.top = 100 * y / canvas.height + "%";
+    control.style.left = 100 * x + "%";
+    control.style.top = 100 * y + "%";
     control.setAttribute("aria-label", "机构 " + item.id + "，" + status[item.status]);
     control.addEventListener("click", () => {
       selectInstitution(item);
@@ -194,9 +221,12 @@ function renderGraph(container, graph, institution, choose) {
   const selected = graph.nodes.find((item) => item.id === institution)
     ?? graph.nodes.find((item) => item.status === "direct")
     ?? graph.nodes[0];
-  selectInstitution(selected);
-  figure.append(stage, readout, node("figcaption", "graph-key", graph.key));
+  figure.append(stage, readout, node("figcaption", "graph-key", graph.key + " 所选机构的收付边会高亮。"));
   container.append(figure);
+  selectInstitution(selected);
+  const observer = new ResizeObserver(draw);
+  observer.observe(stage);
+  return () => observer.disconnect();
 }
 
 function renderBars(container, bars, view, domain, selected, choose) {
@@ -224,6 +254,7 @@ function renderBars(container, bars, view, domain, selected, choose) {
     const track = node("span", "bar-track");
     track.setAttribute("aria-hidden", "true");
     const segment = node("span", "bar-segment");
+    segment.dataset.direction = item.value < reference ? "negative" : "positive";
     segment.style.left = Math.min(position(reference), position(item.value)) + "%";
     segment.style.width = Math.abs(position(item.value) - position(reference)) + "%";
     track.append(segment);
@@ -318,6 +349,7 @@ function init(app) {
   if (state.view < 0) state.view = 0;
   let visibleRecords = [];
   let lastDetail = null;
+  let disposeGraph = null;
 
   function matching(skippedFilter) {
     const terms = state.query.normalize("NFKC").trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
@@ -436,10 +468,12 @@ function init(app) {
     byName("chart-heading", view.title);
     byName("chart-caption", view.caption);
     const container = byId("chart");
+    disposeGraph?.();
+    disposeGraph = null;
     container.replaceChildren();
     if (view.mode === "graph") {
       if (record?.graph?.nodes.length) {
-        renderGraph(container, record.graph, state.institution, (id) => {
+        disposeGraph = renderGraph(container, record.graph, state.institution, (id) => {
           state.institution = id;
           syncUrl();
         });
@@ -469,6 +503,7 @@ function init(app) {
   function renderDetail(record) {
     if (record === lastDetail) return;
     lastDetail = record;
+    byId("detail").scrollTop = 0;
     const container = byId("record-detail");
     container.replaceChildren();
     byId("download-record").disabled = !record;

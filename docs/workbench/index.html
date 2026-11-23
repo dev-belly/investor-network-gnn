@@ -12,34 +12,31 @@
 </head>
 <body>
   <a class="skip" href="#main">跳至工作台</a>
-  <aside class="rail">
-    <a class="brand" href="#main">
-      <span class="brand-mark" aria-hidden="true" id="brand-mark"></span>
-      <span id="brand">数据工作台</span>
-    </a>
-    <nav aria-label="工作台导航">
-      <a href="#overview"><span class="nav-icon overview-icon" aria-hidden="true"></span>分析概览</a>
-      <a href="#records"><span class="nav-icon records-icon" aria-hidden="true"></span>明细记录</a>
-      <a href="#sources"><span class="nav-icon sources-icon" aria-hidden="true"></span>数据来源</a>
-    </nav>
-    <div class="rail-bottom">
-      <!-- Portfolio return link -->
-      <a id="repository" href="https://github.com/dev-belly">GitHub 仓库</a>
+  <header class="rail">
+    <div class="rail-inner">
+      <a class="brand" href="#main">
+        <span class="brand-mark" aria-hidden="true" id="brand-mark"></span>
+        <span id="brand">数据工作台</span>
+      </a>
+      <nav aria-label="工作台导航">
+        <a href="#overview"><span class="nav-icon overview-icon" aria-hidden="true"></span>分析概览</a>
+        <a href="#records"><span class="nav-icon records-icon" aria-hidden="true"></span>明细记录</a>
+        <a href="#sources"><span class="nav-icon sources-icon" aria-hidden="true"></span>数据来源</a>
+      </nav>
+      <div class="rail-bottom">
+        <!-- Portfolio return link -->
+        <a id="repository" href="https://github.com/dev-belly">GitHub 仓库</a>
+      </div>
     </div>
-  </aside>
+  </header>
 
   <main id="main" tabindex="-1">
-    <header class="toolbar">
-      <p class="toolbar-label" id="toolbar-label">数据工作台</p>
-      <div class="toolbar-actions">
-        <a class="button mobile-sources" href="#sources">数据来源</a>
-        <button class="button primary" id="export" type="button" disabled>导出筛选结果</button>
-      </div>
-    </header>
-
     <section class="hero" id="overview" aria-labelledby="title">
       <div class="hero-intro">
-        <p class="hero-kicker" id="hero-kicker"></p>
+        <div class="hero-context">
+          <p id="toolbar-label">数据工作台</p>
+          <p id="hero-kicker"></p>
+        </div>
         <h1 id="title">图信号对照实验</h1>
         <p class="hero-description" id="description"></p>
       </div>
@@ -68,7 +65,10 @@
         <section class="panel records-panel" id="records" aria-labelledby="records-heading">
           <div class="panel-heading">
             <h2 id="records-heading"></h2>
-            <button class="text-button" id="reset" type="button">重置筛选</button>
+            <div class="panel-actions">
+              <button class="text-button" id="reset" type="button">重置筛选</button>
+              <button class="button primary" id="export" type="button" disabled>导出筛选结果</button>
+            </div>
           </div>
           <div id="filters" class="filters"></div>
           <div class="table-wrap records-table" id="records-table" tabindex="0" role="region" aria-label="筛选记录">
