@@ -6,6 +6,7 @@ const byName = (id, value) => {
   if (element.textContent !== value) element.textContent = value;
 };
 const pageSize = 12;
+const maxQueryLength = 140;
 const formatters = {
   integer: new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 }),
   number: new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 3 }),
@@ -30,11 +31,28 @@ function button(text, className) {
   return result;
 }
 
-function roundedFraction(value, scale) {
+function fraction(value) {
   const parts = /^(-?\d+)(?:\/([1-9]\d*))?$/u.exec(String(value));
-  if (!parts) return null;
-  const numerator = BigInt(parts[1]) * scale;
-  const denominator = BigInt(parts[2] ?? "1");
+  return parts ? [BigInt(parts[1]), BigInt(parts[2] ?? "1")] : null;
+}
+
+function compareValues(left, right, kind) {
+  if (kind === "rationalUsd" || kind === "rationalPercent") {
+    const a = fraction(left);
+    const b = fraction(right);
+    if (a && b) {
+      const difference = a[0] * b[1] - b[0] * a[1];
+      return difference < 0n ? -1 : Number(difference > 0n);
+    }
+  }
+  return typeof left === "number" ? left - right : String(left).localeCompare(String(right));
+}
+
+function roundedFraction(value, scale) {
+  const parsed = fraction(value);
+  if (!parsed) return null;
+  const [unscaled, denominator] = parsed;
+  const numerator = unscaled * scale;
   const magnitude = numerator < 0n ? -numerator : numerator;
   let result = magnitude / denominator;
   const twiceRemainder = (magnitude % denominator) * 2n;
@@ -43,6 +61,10 @@ function roundedFraction(value, scale) {
     result += 1n;
   }
   return numerator < 0n ? -result : result;
+}
+
+function queryValue(value) {
+  return value.replace(/[\r\n]+/gu, " ").slice(0, maxQueryLength).replace(/[\uD800-\uDBFF]$/u, "");
 }
 
 function format(value, kind) {
@@ -120,7 +142,7 @@ function drawEdges(canvas, edges, points) {
   }
 }
 
-function renderGraph(container, graph) {
+function renderGraph(container, graph, institution, choose) {
   const figure = node("figure");
   const stage = node("div", "graph-stage");
   const canvas = node("canvas", "graph-canvas");
@@ -162,11 +184,17 @@ function renderGraph(container, graph) {
     control.style.left = 100 * x / canvas.width + "%";
     control.style.top = 100 * y / canvas.height + "%";
     control.setAttribute("aria-label", "机构 " + item.id + "，" + status[item.status]);
-    control.addEventListener("click", () => selectInstitution(item));
+    control.addEventListener("click", () => {
+      selectInstitution(item);
+      choose(item.id);
+    });
     controls.set(item.id, control);
     stage.append(control);
   }
-  selectInstitution(graph.nodes.find((item) => item.status === "direct") ?? graph.nodes[0]);
+  const selected = graph.nodes.find((item) => item.id === institution)
+    ?? graph.nodes.find((item) => item.status === "direct")
+    ?? graph.nodes[0];
+  selectInstitution(selected);
   figure.append(stage, readout, node("figcaption", "graph-key", graph.key));
   container.append(figure);
 }
@@ -204,8 +232,10 @@ function renderBars(container, bars, view, domain, selected, choose) {
       marker.style.left = position(reference) + "%";
       track.append(marker);
     }
-    row.append(node("span", "bar-label", item.label), track,
-      node("span", "bar-value", format(item.value, view.format)));
+    const label = item.displayValue === undefined
+      ? format(item.value, view.format)
+      : format(item.displayValue, view.displayFormat);
+    row.append(node("span", "bar-label", item.label), track, node("span", "bar-value", label));
     list.append(row);
   }
   container.append(list);
@@ -270,16 +300,19 @@ function init(app) {
       .join(" ").normalize("NFKC").toLocaleLowerCase(),
   ]));
   const ownedKeys = ["q", "sort", "view", "record", ...options.keys()];
+  const hasGraph = app.views.some(({ mode }) => mode === "graph");
+  if (hasGraph) ownedKeys.push("node");
   const filterState = new Map(app.filters.map(({ key }) => {
     const value = parameters.get(key) ?? "";
     return [key, options.get(key).includes(value) ? value : ""];
   }));
   const state = {
-    query: (parameters.get("q") ?? "").slice(0, 140),
+    query: queryValue(parameters.get("q") ?? ""),
     filters: filterState,
     order: app.orders.some(({ id }) => id === parameters.get("sort")) ? parameters.get("sort") : "",
     view: app.views.findIndex(({ id }) => id === parameters.get("view")),
     record: parameters.get("record") ?? app.initialRecord,
+    institution: hasGraph ? parameters.get("node") ?? "" : "",
     page: 0,
   };
   if (state.view < 0) state.view = 0;
@@ -302,7 +335,7 @@ function init(app) {
       if (a == null) return b == null ? 0 : 1;
       if (b == null) return -1;
       const direction = order.descending ? -1 : 1;
-      return direction * (typeof a === "number" ? a - b : String(a).localeCompare(String(b)));
+      return direction * compareValues(a, b, order.format);
     });
     return filtered;
   }
@@ -315,6 +348,7 @@ function init(app) {
     if (state.order) url.searchParams.set("sort", state.order);
     if (state.view) url.searchParams.set("view", app.views[state.view].id);
     if (state.record && state.record !== app.initialRecord) url.searchParams.set("record", state.record);
+    if (state.institution) url.searchParams.set("node", state.institution);
     if (url.href === location.href) return;
     try {
       history.replaceState(history.state, "", url);
@@ -357,15 +391,19 @@ function init(app) {
         action: { filter: view.group, value, key: view.group + ":" + value },
       }));
     }
-    if (view.mode === "detail") return record?.charts?.[view.id] ?? [];
+    if (view.mode === "detail") {
+      return (record?.charts?.[view.id] ?? []).filter((bar) => Number.isFinite(bar.value));
+    }
     const results = records.filter((item) => Number.isFinite(item.values[view.metric]));
-    if (view.descending) results.sort((a, b) => b.values[view.metric] - a.values[view.metric]);
+    const sortKey = view.displayKey ?? view.metric;
+    if (view.descending) results.sort((a, b) => compareValues(b.values[sortKey], a.values[sortKey], view.displayFormat));
     const limit = view.limit ?? 8;
     const shown = results.slice(0, limit);
     if (record && results.includes(record) && !shown.includes(record)) shown[shown.length - 1] = record;
     return shown.map((item) => ({
       label: item.chartLabel ?? item.title,
       value: item.values[view.metric],
+      displayValue: item.values[view.displayKey],
       action: { record: item.id, key: item.id },
     }));
   }
@@ -374,9 +412,14 @@ function init(app) {
     return action.record ? state.record === action.record : state.filters.get(action.filter) === action.value;
   }
 
+  function selectRecord(id) {
+    if (state.record !== id) state.institution = "";
+    state.record = id;
+  }
+
   function chooseChart(action) {
     if (action.record) {
-      state.record = action.record;
+      selectRecord(action.record);
     } else {
       const value = chartSelected(action) ? "" : action.value;
       state.filters.set(action.filter, value);
@@ -395,8 +438,12 @@ function init(app) {
     const container = byId("chart");
     container.replaceChildren();
     if (view.mode === "graph") {
-      if (record?.graph?.nodes.length) renderGraph(container, record.graph);
-      else container.append(node("p", "empty", "选择清算情景以查看网络。"));
+      if (record?.graph?.nodes.length) {
+        renderGraph(container, record.graph, state.institution, (id) => {
+          state.institution = id;
+          syncUrl();
+        });
+      } else container.append(node("p", "empty", "选择清算情景以查看网络。"));
     } else {
       renderBars(container, chartData(view, records, record), view, domains.get(view.id), chartSelected, chooseChart);
     }
@@ -410,7 +457,7 @@ function init(app) {
   }
 
   function chooseRecord(id) {
-    state.record = id;
+    selectRecord(id);
     refresh();
     if (matchMedia("(max-width: 970px)").matches) {
       byId("detail").focus();
@@ -445,7 +492,10 @@ function init(app) {
     state.page = Math.max(0, Math.min(state.page, maxPage));
     const start = state.page * pageSize;
     const record = index >= 0 ? records[index] : records[start];
-    state.record = record?.id ?? "";
+    selectRecord(record?.id ?? "");
+    if (state.institution && !record?.graph?.nodes.some(({ id }) => id === state.institution)) {
+      state.institution = "";
+    }
     const rows = byId("rows");
     rows.replaceChildren();
     for (const entry of records.slice(start, start + pageSize)) {
@@ -520,12 +570,14 @@ function init(app) {
 
   const search = node("input");
   search.type = "search";
-  search.maxLength = 140;
+  search.maxLength = maxQueryLength;
   search.value = state.query;
   search.placeholder = app.searchPlaceholder;
   function searchUpdated() {
-    if (state.query === search.value) return;
-    state.query = search.value;
+    const value = queryValue(search.value);
+    if (search.value !== value) search.value = value;
+    if (state.query === value) return;
+    state.query = value;
     state.page = 0;
     refresh();
   }
@@ -580,7 +632,8 @@ function init(app) {
     }
     state.query = search.value = "";
     state.order = order.value = "";
-    state.record = app.initialRecord;
+    selectRecord(app.initialRecord);
+    state.institution = "";
     state.page = 0;
     refresh();
   });
@@ -588,7 +641,7 @@ function init(app) {
   function changePage(offset) {
     const active = document.activeElement;
     state.page += offset;
-    state.record = "";
+    selectRecord("");
     refresh();
     if (active === byId("previous") && byId("previous").disabled) byId("next").focus();
     if (active === byId("next") && byId("next").disabled) byId("previous").focus();
