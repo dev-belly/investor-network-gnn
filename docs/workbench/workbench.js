@@ -1,8 +1,10 @@
 "use strict";
 
-const demo = window.workbenchData;
 const byId = (id) => document.getElementById(id);
-const byName = (id, value) => { byId(id).textContent = value; };
+const byName = (id, value) => {
+  const element = byId(id);
+  if (element.textContent !== value) element.textContent = value;
+};
 const pageSize = 12;
 const formatters = {
   integer: new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 }),
@@ -28,19 +30,38 @@ function button(text, className) {
   return result;
 }
 
-function ratio(value) {
-  const [numerator, denominator] = String(value).split("/").map(Number);
-  return numerator / (denominator ?? 1);
+function roundedFraction(value, scale) {
+  const parts = /^(-?\d+)(?:\/([1-9]\d*))?$/u.exec(String(value));
+  if (!parts) return null;
+  const numerator = BigInt(parts[1]) * scale;
+  const denominator = BigInt(parts[2] ?? "1");
+  const magnitude = numerator < 0n ? -numerator : numerator;
+  let result = magnitude / denominator;
+  const twiceRemainder = (magnitude % denominator) * 2n;
+  // Match NetworkClear's exact, round-half-even display contract.
+  if (twiceRemainder > denominator || (twiceRemainder === denominator && result % 2n === 1n)) {
+    result += 1n;
+  }
+  return numerator < 0n ? -result : result;
 }
 
 function format(value, kind) {
   if (value == null || value === "") return "—";
-  if (formatters[kind]) return formatters[kind].format(value);
+  if (Object.hasOwn(formatters, kind)) return formatters[kind].format(value);
   if (kind === "bps") return formatters.fixed2.format(value) + " bp";
   if (kind === "nsMs") return formatters.number.format(value / 1e6) + " ms";
   if (kind === "millionCny") return formatters.fixed2.format(value / 1e6) + " 百万元";
-  if (kind === "rationalUsd") return formatters.usd.format(ratio(value) / 100);
-  if (kind === "rationalPercent") return formatters.percent.format(ratio(value));
+  if (kind === "rationalUsd") {
+    const cents = roundedFraction(value, 1n);
+    if (cents === null) return "—";
+    const absolute = cents < 0n ? -cents : cents;
+    const sign = cents < 0n ? "-$" : "$";
+    return sign + formatters.integer.format(absolute / 100n) + "." + String(absolute % 100n).padStart(2, "0");
+  }
+  if (kind === "rationalPercent") {
+    const basisPoints = roundedFraction(value, 10000n);
+    return basisPoints === null ? "—" : formatters.percent.format(Number(basisPoints) / 10000);
+  }
   return String(value);
 }
 
@@ -57,83 +78,116 @@ function download(text, filename, type) {
 
 function csvCell(value) {
   const raw = value == null ? "" : String(value);
-  const formula = typeof value === "string" && /^[\s\u0000-\u001f]*[=+\-@]/u.test(raw.normalize("NFKC"));
+  const formula = typeof value === "string" && /^[\p{White_Space}\p{Cc}\p{Cf}]*[=+\-@]/u.test(raw.normalize("NFKC"));
   const safe = formula ? "'" + raw : raw;
   return '"' + safe.replaceAll('"', '""') + '"';
 }
 
-function renderGraph(container, graph) {
-  const canvas = node("canvas", "graph");
-  canvas.width = 960;
-  canvas.height = 460;
-  canvas.setAttribute("role", "img");
-  canvas.setAttribute("aria-label", graph.summary);
-  container.append(canvas, node("p", "graph-key", graph.key));
+function csvHeading({ title, exportTitle, format: kind }) {
+  if (exportTitle) return exportTitle;
+  const units = { percent: "比例", bps: "bp", millionCny: "元", cny: "元", usd: "USD" };
+  return Object.hasOwn(units, kind) ? title + "（" + units[kind] + "）" : title;
+}
+
+function drawEdges(canvas, edges, points) {
   const context = canvas.getContext("2d");
   if (!context) return;
-
-  const points = new Map(graph.nodes.map((item) => [item.id, {
-    x: 62 + item.x * 836,
-    y: 53 + item.y * 354,
-  }]));
-  for (const edge of graph.edges) {
+  for (const edge of edges) {
     const source = points.get(edge.from);
     const target = points.get(edge.to);
+    if (!source || !target) continue;
     const angle = Math.atan2(target.y - source.y, target.x - source.x);
     const dx = Math.cos(angle);
     const dy = Math.sin(angle);
-    const offset = edge.reverse ? 6 : 0;
-    const x = target.x - dx * 29 - dy * offset;
-    const y = target.y - dy * 29 + dx * offset;
-    context.strokeStyle = edge.short ? "#af3c4b" : "#56788b";
-    context.lineWidth = edge.short ? 4 : 2.5;
+    const offset = edge.reverse ? 8 : 0;
+    const stop = 43;
+    const x = target.x - dx * stop - dy * offset;
+    const y = target.y - dy * stop + dx * offset;
+    context.strokeStyle = edge.short ? "#a63d4a" : "#587981";
+    context.lineWidth = edge.short ? 4.1 : 3.2;
+    if (edge.short) context.setLineDash([12, 6]);
     context.beginPath();
-    context.moveTo(source.x + dx * 29 - dy * offset, source.y + dy * 29 + dx * offset);
+    context.moveTo(source.x + dx * stop - dy * offset, source.y + dy * stop + dx * offset);
     context.lineTo(x, y);
+    context.stroke();
+    context.setLineDash([]);
+    context.beginPath();
+    context.moveTo(x, y);
     context.lineTo(x - dx * 13 - dy * 6, y - dy * 13 + dx * 6);
     context.moveTo(x, y);
     context.lineTo(x - dx * 13 + dy * 6, y - dy * 13 - dx * 6);
     context.stroke();
   }
-
-  const colors = {
-    direct: ["#a93047", "#ffffff"],
-    cascade: ["#f8e1bb", "#663800"],
-    solvent: ["#e0eee9", "#164f43"],
-    outside: ["#dfe8f7", "#193f6b"],
-  };
-  for (const item of graph.nodes) {
-    const { x, y } = points.get(item.id);
-    const [fill, ink] = colors[item.status];
-    context.beginPath();
-    context.arc(x, y, 27, 0, 2 * Math.PI);
-    context.fillStyle = fill;
-    context.fill();
-    context.strokeStyle = ink;
-    context.lineWidth = 1.5;
-    context.stroke();
-    context.fillStyle = ink;
-    context.font = "700 23px system-ui";
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    context.fillText(item.label ?? item.id, x, y);
-  }
 }
 
-function renderBars(container, bars, view, selected, choose) {
+function renderGraph(container, graph) {
+  const figure = node("figure");
+  const stage = node("div", "graph-stage");
+  const canvas = node("canvas", "graph-canvas");
+  canvas.width = 960;
+  canvas.height = 464;
+  canvas.setAttribute("role", "img");
+  canvas.setAttribute("aria-label", graph.summary);
+  stage.append(canvas);
+  const points = new Map(graph.nodes.map((item) => [item.id, {
+    x: 67 + item.x * 826,
+    y: 52 + item.y * 360,
+  }]));
+  drawEdges(canvas, graph.edges, points);
+
+  const readout = node("dl", "graph-readout");
+  readout.setAttribute("aria-live", "polite");
+  const status = { direct: "直接违约", cascade: "传染违约", solvent: "足额偿付" };
+  const controls = new Map();
+  function selectInstitution(item) {
+    for (const [id, control] of controls) {
+      control.setAttribute("aria-pressed", String(id === item.id));
+    }
+    const facts = [
+      ["机构状态", item.id + " · " + status[item.status]],
+      ["实际付款", format(item.paid, "rationalUsd")],
+      ["名义负债", format(item.nominal, "rationalUsd")],
+      ["回收率", format(item.recovery, "rationalPercent")],
+    ];
+    readout.replaceChildren(...facts.map(([label, value]) => {
+      const term = node("div");
+      term.append(node("dt", null, label), node("dd", null, value));
+      return term;
+    }));
+  }
+  for (const item of graph.nodes) {
+    const { x, y } = points.get(item.id);
+    const control = button(item.id, "graph-node");
+    control.dataset.status = item.status;
+    control.style.left = 100 * x / canvas.width + "%";
+    control.style.top = 100 * y / canvas.height + "%";
+    control.setAttribute("aria-label", "机构 " + item.id + "，" + status[item.status]);
+    control.addEventListener("click", () => selectInstitution(item));
+    controls.set(item.id, control);
+    stage.append(control);
+  }
+  selectInstitution(graph.nodes.find((item) => item.status === "direct") ?? graph.nodes[0]);
+  figure.append(stage, readout, node("figcaption", "graph-key", graph.key));
+  container.append(figure);
+}
+
+function renderBars(container, bars, view, domain, selected, choose) {
   if (bars.length === 0) {
-    container.append(node("p", "empty", "当前选择没有可展示的数据。"));
+    container.append(node("p", "empty", view.empty ?? "当前筛选没有可绘制的记录。"));
     return;
   }
 
-  const reference = view.reference ?? 0;
-  const values = bars.map(({ value }) => value);
-  const min = Math.min(view.min ?? 0, reference, ...values);
-  const max = Math.max(view.max ?? 0, reference, ...values);
+  const { min, max, reference } = domain;
   const position = (value) => 100 * (value - min) / (max - min || 1);
   const list = node("div", "chart-bars");
+  const scale = node("div", "chart-scale chart-columns");
+  const axis = node("div", "axis-values");
+  scale.setAttribute("aria-hidden", "true");
+  axis.append(node("span", null, format(min, view.format)), node("span", null, format(max, view.format)));
+  scale.append(node("span"), axis, node("span"));
+  list.append(scale);
   for (const item of bars) {
-    const row = item.action ? button(null, "bar-row") : node("div", "bar-row");
+    const row = item.action ? button(null, "bar-row chart-columns") : node("div", "bar-row chart-columns");
     if (item.action) {
       row.setAttribute("aria-pressed", String(selected(item.action)));
       row.dataset.bar = item.action.key;
@@ -204,10 +258,18 @@ function renderSection(section) {
 
 function init(app) {
   const parameters = new URLSearchParams(location.search);
-  const labels = (key, value) => app.filters.find((item) => item.key === key)?.labels?.[value] ?? value;
+  const filtersByKey = new Map(app.filters.map((filter) => [filter.key, filter]));
+  const labels = (key, value) => filtersByKey.get(key)?.labels?.[value] ?? value;
   const options = new Map(app.filters.map(({ key }) => [
     key, [...new Set(app.records.map((record) => String(record.values[key])))],
   ]));
+  const searchIndex = new Map(app.records.map((record) => [
+    record.id,
+    [record.id, record.title, record.subtitle, record.search,
+      ...Object.entries(record.values).flatMap(([key, value]) => [value, labels(key, value)])]
+      .join(" ").normalize("NFKC").toLocaleLowerCase(),
+  ]));
+  const ownedKeys = ["q", "sort", "view", "record", ...options.keys()];
   const filterState = new Map(app.filters.map(({ key }) => {
     const value = parameters.get(key) ?? "";
     return [key, options.get(key).includes(value) ? value : ""];
@@ -221,18 +283,18 @@ function init(app) {
     page: 0,
   };
   if (state.view < 0) state.view = 0;
+  let visibleRecords = [];
+  let lastDetail = null;
 
-  function matching() {
-    const terms = state.query.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
+  function matching(skippedFilter) {
+    const terms = state.query.normalize("NFKC").trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
     const filtered = app.records.filter((record) => {
       for (const [key, value] of state.filters) {
-        if (value && String(record.values[key]) !== value) return false;
+        if (key !== skippedFilter && value && String(record.values[key]) !== value) return false;
       }
-      if (terms.length === 0) return true;
-      const text = [record.id, record.title, record.subtitle, record.search, ...Object.values(record.values)]
-        .join(" ").toLocaleLowerCase();
-      return terms.every((term) => text.includes(term));
+      return terms.every((term) => searchIndex.get(record.id).includes(term));
     });
+    if (skippedFilter) return filtered;
     const order = app.orders.find(({ id }) => id === state.order);
     if (order) filtered.sort((left, right) => {
       const a = left.values[order.key];
@@ -247,29 +309,51 @@ function init(app) {
 
   function syncUrl() {
     const url = new URL(location.href);
-    url.search = "";
+    for (const key of ownedKeys) url.searchParams.delete(key);
     for (const [key, value] of state.filters) if (value) url.searchParams.set(key, value);
     if (state.query) url.searchParams.set("q", state.query);
     if (state.order) url.searchParams.set("sort", state.order);
     if (state.view) url.searchParams.set("view", app.views[state.view].id);
     if (state.record && state.record !== app.initialRecord) url.searchParams.set("record", state.record);
+    if (url.href === location.href) return;
     try {
-      history.replaceState(null, "", url);
+      history.replaceState(history.state, "", url);
     } catch (error) {
       if (error.name !== "SecurityError") throw error;
     }
   }
 
+  function groupCounts(records, key) {
+    const counts = new Map(options.get(key).map((value) => [value, 0]));
+    for (const { values } of records) {
+      const group = String(values[key]);
+      counts.set(group, counts.get(group) + 1);
+    }
+    return counts;
+  }
+
+  const domains = new Map(app.views.filter(({ mode }) => mode !== "graph").map((view) => {
+    let values;
+    if (view.mode === "group") values = [...groupCounts(app.records, view.group).values()];
+    else if (view.mode === "detail") values = app.records.flatMap(
+      (record) => (record.charts?.[view.id] ?? []).map((bar) => bar.value),
+    );
+    else values = app.records.map((record) => record.values[view.metric]);
+    const finite = values.filter(Number.isFinite);
+    const reference = view.reference ?? 0;
+    return [view.id, {
+      reference,
+      min: Math.min(view.min ?? 0, reference, ...finite),
+      max: Math.max(view.max ?? 0, reference, ...finite),
+    }];
+  }));
+
   function chartData(view, records, record) {
     if (view.mode === "group") {
-      const groups = new Map();
-      for (const item of records) {
-        const value = String(item.values[view.group]);
-        groups.set(value, (groups.get(value) ?? 0) + 1);
-      }
-      return options.get(view.group).filter((value) => groups.has(value)).map((value) => ({
+      const counts = groupCounts(matching(view.group), view.group);
+      return [...counts].map(([value, count]) => ({
         label: labels(view.group, value),
-        value: groups.get(value),
+        value: count,
         action: { filter: view.group, value, key: view.group + ":" + value },
       }));
     }
@@ -293,7 +377,6 @@ function init(app) {
   function chooseChart(action) {
     if (action.record) {
       state.record = action.record;
-      state.page = Math.floor(matching().findIndex(({ id }) => id === action.record) / pageSize);
     } else {
       const value = chartSelected(action) ? "" : action.value;
       state.filters.set(action.filter, value);
@@ -311,28 +394,38 @@ function init(app) {
     byName("chart-caption", view.caption);
     const container = byId("chart");
     container.replaceChildren();
-    if (view.mode === "graph" && record?.graph) renderGraph(container, record.graph);
-    else renderBars(container, chartData(view, records, record), view, chartSelected, chooseChart);
+    if (view.mode === "graph") {
+      if (record?.graph?.nodes.length) renderGraph(container, record.graph);
+      else container.append(node("p", "empty", "选择清算情景以查看网络。"));
+    } else {
+      renderBars(container, chartData(view, records, record), view, domains.get(view.id), chartSelected, chooseChart);
+    }
     [...byId("views").children].forEach((item, index) => {
       item.setAttribute("aria-pressed", String(index === state.view));
     });
   }
 
+  function selectedButton() {
+    return [...byId("rows").querySelectorAll("button")].find((item) => item.dataset.id === state.record);
+  }
+
   function chooseRecord(id) {
     state.record = id;
     refresh();
-    if (matchMedia("(max-width: 940px)").matches) {
+    if (matchMedia("(max-width: 970px)").matches) {
       byId("detail").focus();
     } else {
-      [...byId("rows").querySelectorAll("button")].find((item) => item.dataset.id === id)
-        ?.focus({ preventScroll: true });
+      selectedButton()?.focus({ preventScroll: true });
     }
   }
 
   function renderDetail(record) {
+    if (record === lastDetail) return;
+    lastDetail = record;
     const container = byId("record-detail");
     container.replaceChildren();
     byId("download-record").disabled = !record;
+    byId("return-records").disabled = !record;
     if (!record) {
       container.append(node("p", "empty", "筛选后可选择一条记录查看详情。"));
       return;
@@ -344,19 +437,24 @@ function init(app) {
   }
 
   function refresh() {
-    const records = matching();
-    const record = records.find(({ id }) => id === state.record) ?? records[state.page * pageSize] ?? records[0];
-    state.record = record?.id ?? "";
+    visibleRecords = matching();
+    const records = visibleRecords;
     const maxPage = Math.max(0, Math.ceil(records.length / pageSize) - 1);
+    const index = records.findIndex(({ id }) => id === state.record);
+    if (index >= 0) state.page = Math.floor(index / pageSize);
     state.page = Math.max(0, Math.min(state.page, maxPage));
     const start = state.page * pageSize;
+    const record = index >= 0 ? records[index] : records[start];
+    state.record = record?.id ?? "";
     const rows = byId("rows");
     rows.replaceChildren();
     for (const entry of records.slice(start, start + pageSize)) {
       const row = node("tr");
+      row.setAttribute("role", "row");
       row.dataset.selected = String(entry.id === state.record);
       const first = node("th", "records-cell");
       first.scope = "row";
+      first.setAttribute("role", "rowheader");
       const link = button(entry.title, "record-button");
       link.dataset.id = entry.id;
       link.setAttribute("aria-pressed", row.dataset.selected);
@@ -365,11 +463,15 @@ function init(app) {
       row.append(first);
       for (const column of app.columns) {
         const value = entry.values[column.key];
-        row.append(node("td", "records-cell", format(labels(column.key, value), column.format)));
+        const cell = node("td", "records-cell", format(labels(column.key, value), column.format));
+        cell.setAttribute("role", "cell");
+        cell.dataset.label = column.title;
+        row.append(cell);
       }
       rows.append(row);
     }
     byId("empty").hidden = records.length > 0;
+    byId("records-table").hidden = records.length === 0;
     byId("export").disabled = records.length === 0;
     byId("previous").disabled = state.page === 0;
     byId("next").disabled = state.page === maxPage;
@@ -388,11 +490,12 @@ function init(app) {
   }
 
   document.title = app.project + " · " + app.title;
+  document.querySelector('meta[name="description"]').content = app.description;
   for (const [name, color] of Object.entries(app.theme)) {
     document.documentElement.style.setProperty("--" + name, color);
   }
   const texts = {
-    "brand-mark": app.mark, brand: app.project, "data-kind": app.dataKind,
+    "brand-mark": app.mark, brand: app.project,
     "toolbar-label": app.workspace, "hero-kicker": app.dataKind, title: app.title,
     description: app.description, "hero-stat-label": app.hero.label, "hero-stat-value": app.hero.value,
     "hero-stat-note": app.hero.note, "records-heading": app.recordHeading,
@@ -420,11 +523,16 @@ function init(app) {
   search.maxLength = 140;
   search.value = state.query;
   search.placeholder = app.searchPlaceholder;
-  search.addEventListener("input", () => {
+  function searchUpdated() {
+    if (state.query === search.value) return;
     state.query = search.value;
     state.page = 0;
     refresh();
+  }
+  search.addEventListener("input", (event) => {
+    if (!event.isComposing) searchUpdated();
   });
+  search.addEventListener("compositionend", searchUpdated);
   byId("filters").append(field("搜索", search, "field search"));
   const filterFields = new Map();
   for (const definition of app.filters) {
@@ -453,6 +561,7 @@ function init(app) {
   for (const label of [app.recordLabel, ...app.columns.map(({ title }) => title)]) {
     const cell = node("th", null, label);
     cell.scope = "col";
+    cell.setAttribute("role", "columnheader");
     byId("columns").append(cell);
   }
   app.views.forEach(({ label }, index) => {
@@ -477,15 +586,19 @@ function init(app) {
   });
 
   function changePage(offset) {
+    const active = document.activeElement;
     state.page += offset;
-    state.record = matching()[state.page * pageSize]?.id;
+    state.record = "";
     refresh();
+    if (active === byId("previous") && byId("previous").disabled) byId("next").focus();
+    if (active === byId("next") && byId("next").disabled) byId("previous").focus();
   }
   byId("previous").addEventListener("click", () => changePage(-1));
   byId("next").addEventListener("click", () => changePage(1));
+  byId("return-records").addEventListener("click", () => selectedButton()?.focus());
   byId("export").addEventListener("click", () => {
-    const header = [app.recordLabel, ...app.columns.map(({ title, exportTitle }) => exportTitle ?? title)];
-    const records = matching().map((record) => [
+    const header = [app.recordLabel, ...app.columns.map(csvHeading)];
+    const records = visibleRecords.map((record) => [
       record.title, ...app.columns.map(({ key }) => record.values[key]),
     ]);
     const csv = [header, ...records].map((row) => row.map(csvCell).join(",")).join("\r\n");
@@ -501,11 +614,15 @@ function init(app) {
     const id = record.id.replace(/[^a-z0-9_-]+/gi, "-");
     download(JSON.stringify(data, null, 2) + "\n", app.slug + "-" + id + ".json", "application/json");
   });
-  byId("workspace").hidden = false;
-  const selectedIndex = matching().findIndex(({ id }) => id === parameters.get("record"));
-  if (selectedIndex >= 0) state.page = Math.floor(selectedIndex / pageSize);
   refresh();
+  for (const id of ["hero-stat", "metrics", "workspace", "sources"]) byId(id).hidden = false;
 }
 
-if (demo?.records?.length) init(demo);
-else byId("startup-error").hidden = false;
+try {
+  const app = window.workbenchData;
+  if (!app?.records?.length || !app.views?.length) throw new Error("No usable workbench snapshot");
+  init(app);
+} catch (error) {
+  console.error("Workbench startup failed", error);
+  byId("startup-error").hidden = false;
+}
