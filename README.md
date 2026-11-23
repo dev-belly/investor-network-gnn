@@ -13,6 +13,15 @@
 
 ---
 
+## 浏览器实验工作台
+
+比较三个种子下四种模型的样本外结果，也可查看同一个 GCN 在测试阶段删边时的表现。
+
+[工作台源码](docs/workbench/)
+
+克隆后直接打开 `docs/workbench/index.html`，即可离线筛选、查看明细并导出 CSV 或 JSON。
+运行 `python docs/workbench/build_data.py --check` 校验已提交的样例快照。
+
 ## 1. 项目亮点
 
 | 模块 | 实现 |

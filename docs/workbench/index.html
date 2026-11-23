@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>工作台</title>
+  <link rel="stylesheet" href="workbench.css">
+  <script defer src="data.js"></script>
+  <script defer src="workbench.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳转至内容</a>
+  <aside class="rail">
+    <a class="brand" href="#main">
+      <span class="brand-mark" aria-hidden="true" id="brand-mark"></span>
+      <span id="brand"></span>
+    </a>
+    <nav aria-label="工作台导航">
+      <a href="#overview"><span class="nav-icon overview-icon" aria-hidden="true"></span>分析概览</a>
+      <a href="#records"><span class="nav-icon records-icon" aria-hidden="true"></span>明细记录</a>
+      <a href="#sources"><span class="nav-icon sources-icon" aria-hidden="true"></span>数据来源</a>
+    </nav>
+    <div class="rail-bottom">
+      <span id="data-kind"></span>
+      <a id="repository" href="#">GitHub 仓库</a>
+    </div>
+  </aside>
+
+  <main id="main" tabindex="-1">
+    <header class="toolbar">
+      <span id="toolbar-label"></span>
+      <div class="toolbar-actions">
+        <a class="button" href="#sources">数据来源</a>
+        <button class="button primary" id="export" type="button" disabled>导出筛选结果</button>
+      </div>
+    </header>
+
+    <section class="hero" id="overview" aria-labelledby="title">
+      <div>
+        <p class="hero-kicker" id="hero-kicker"></p>
+        <h1 id="title"></h1>
+        <p class="hero-description" id="description"></p>
+      </div>
+      <div class="hero-stat">
+        <span id="hero-stat-label"></span>
+        <strong id="hero-stat-value"></strong>
+        <small id="hero-stat-note"></small>
+      </div>
+    </section>
+
+    <dl class="metrics" id="metrics" aria-label="样例概要"></dl>
+
+    <noscript><p class="notice">请启用 JavaScript 以查看工作台。</p></noscript>
+    <p class="notice" id="startup-error" role="alert" hidden>样例未能加载。请确认工作台文件在同一目录下。</p>
+
+    <div class="workspace" id="workspace" hidden>
+      <div class="workspace-main">
+        <section class="panel chart-panel" aria-labelledby="chart-heading">
+          <div class="panel-heading">
+            <h2 id="chart-heading"></h2>
+            <div class="views" id="views" role="group" aria-label="图表视图"></div>
+          </div>
+          <p class="panel-copy" id="chart-caption"></p>
+          <div id="chart"></div>
+        </section>
+
+        <section class="panel" id="records" aria-labelledby="records-heading">
+          <div class="panel-heading">
+            <h2 id="records-heading"></h2>
+            <button class="text-button" id="reset" type="button">重置</button>
+          </div>
+          <div id="filters" class="filters"></div>
+          <div class="table-wrap" tabindex="0" role="region" aria-label="筛选记录">
+            <table>
+              <thead><tr id="columns"></tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <p id="empty" class="empty" hidden>没有符合条件的记录。调整筛选条件或重置后重试。</p>
+          <footer class="pagination">
+            <span id="count" role="status" aria-live="polite"></span>
+            <div class="page-buttons">
+              <button class="button" id="previous" type="button">上一页</button>
+              <button class="button" id="next" type="button">下一页</button>
+            </div>
+          </footer>
+        </section>
+      </div>
+
+      <section class="panel detail" id="detail" aria-labelledby="detail-heading" tabindex="-1">
+        <div class="panel-heading">
+          <h2 id="detail-heading"></h2>
+          <button class="text-button" id="download-record" type="button" disabled>导出 JSON</button>
+        </div>
+        <div id="record-detail"></div>
+      </section>
+    </div>
+
+    <footer class="panel source-panel" id="sources" aria-labelledby="sources-heading">
+      <h2 id="sources-heading">数据来源与口径</h2>
+      <p id="source-note"></p>
+      <ul id="source-list"></ul>
+    </footer>
+  </main>
+</body>
+</html>
