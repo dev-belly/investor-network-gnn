@@ -376,15 +376,57 @@ td { font-variant-numeric: tabular-nums; }
   scrollbar-color: #b3c4ba transparent;
 }
 .detail .panel-heading { padding-bottom: .56rem; border-bottom: 1px solid var(--line); }
-.comparison { margin-top: .7rem; padding: .62rem .73rem; border: 1px solid var(--line); border-radius: .78rem; background: var(--accent-soft); }
-.comparison-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .28rem; }
-.comparison-top h3 { font-size: .98rem; font-weight: 730; }
-.comparison-top .text-button { min-height: 2.3rem; }
-.reference-name { margin-bottom: .26rem; color: var(--accent); font-size: .9rem; font-weight: 700; }
-.comparison-hint { color: var(--muted); font-size: .875rem; }
-.comparison table { table-layout: fixed; margin-top: .13rem; font-size: .875rem; }
-.comparison th, .comparison td { padding: .35rem .25rem; overflow-wrap: anywhere; }
+.comparison {
+  margin-top: .78rem;
+  padding: clamp(.65rem, 1.45vw, 1rem);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: linear-gradient(160deg, var(--accent-soft), var(--surface) 76%);
+}
+.comparison-top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .2rem .55rem; }
+.comparison-top h3 { font-size: 1.12rem; font-weight: 750; letter-spacing: -.03em; }
+.comparison-top .text-button { min-height: 2.6rem; }
+.comparison-pair { display: flex; gap: .45rem; margin-block: .33rem .58rem; }
+.comparison-identity {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: .58rem .64rem;
+  border: 1px solid var(--line);
+  border-radius: .63rem;
+  background: var(--surface);
+}
+.comparison-identity + .comparison-identity { border-color: color-mix(in srgb, var(--accent) 29%, var(--line)); }
+.comparison-identity dt { color: var(--muted); font-size: .875rem; }
+.comparison-identity dd { margin-top: .13rem; font-weight: 720; font-size: .94rem; line-height: 1.35; }
+.comparison-hint, .share-status { margin-top: .49rem; color: var(--muted); font-size: .875rem; line-height: 1.45; }
+.share-status:empty { margin-top: 0; }
+.comparison table { table-layout: fixed; font-size: .875rem; line-height: 1.4; }
+.comparison th, .comparison td { padding: .46rem .24rem; overflow-wrap: anywhere; }
 .comparison thead th { background: transparent; }
+.comparison tbody th { font-weight: 650; }
+.comparison-change { color: var(--accent); font-weight: 720; }
+.comparison-actions { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .78rem; }
+.comparison-actions button { min-height: 2.75rem; }
+.share-dialog {
+  width: min(100% - 2rem, 33rem);
+  max-width: none;
+  padding: clamp(1rem, 3vw, 1.6rem);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 78px #14243c2b;
+}
+.share-dialog::backdrop { background: #14203390; }
+.share-dialog form { display: grid; justify-items: start; gap: .6rem; }
+.share-dialog p { color: var(--muted); }
+.share-dialog input {
+  width: 100%;
+  min-width: 0;
+  padding: .61rem .68rem;
+  border: 1px solid var(--line);
+  border-radius: .55rem;
+  font-size: .94rem;
+}
 .record-heading { margin: .83rem 0 .25rem; font-size: clamp(1.25rem, 2.3vw, 1.74rem); font-weight: 750; line-height: 1.23; letter-spacing: -.04em; }
 .record-caption { margin-bottom: .7rem; color: var(--muted); font-size: .875rem; }
 .fact-list {

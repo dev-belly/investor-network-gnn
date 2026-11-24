@@ -103,6 +103,11 @@
             <button class="text-button" id="clear-comparison" type="button">取消对照</button>
           </div>
           <div id="comparison-content"></div>
+          <div class="comparison-actions" id="comparison-actions" hidden>
+            <button class="button primary" id="share-comparison" type="button">复制对照链接</button>
+            <button class="button" id="export-comparison" type="button">导出对照 CSV</button>
+          </div>
+          <p class="share-status" id="share-status" role="status"></p>
         </section>
         <div id="record-detail"></div>
       </section>
@@ -114,5 +119,14 @@
       <ul id="source-list"></ul>
     </footer>
   </main>
+  <dialog class="share-dialog" id="share-dialog" aria-labelledby="share-heading">
+    <form method="dialog">
+      <h2 id="share-heading">对照链接</h2>
+      <p>选中下方地址，复制后可打开这组对照。</p>
+      <label for="share-url">链接地址</label>
+      <input id="share-url" type="url" readonly>
+      <button class="button primary" type="submit">关闭</button>
+    </form>
+  </dialog>
 </body>
 </html>
