@@ -7,6 +7,10 @@ const byName = (id, value) => {
 };
 const pageSize = 12;
 const maxQueryLength = 140;
+const percentagePoints = new Intl.NumberFormat("zh-CN", {
+  maximumFractionDigits: 2,
+  signDisplay: "exceptZero",
+});
 const formatters = {
   integer: new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 0 }),
   number: new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 3 }),
@@ -87,6 +91,32 @@ function format(value, kind) {
   return String(value);
 }
 
+function formatDifference(reference, current, kind) {
+  if (reference == null || current == null || reference === "" || current === "") return "—";
+  if (kind === "rationalUsd" || kind === "rationalPercent") {
+    const base = fraction(reference);
+    const next = fraction(current);
+    if (!base || !next) return "—";
+    const numerator = next[0] * base[1] - base[0] * next[1];
+    const denominator = next[1] * base[1];
+    const difference = roundedFraction(numerator + "/" + denominator, kind === "rationalUsd" ? 1n : 10000n);
+    if (kind === "rationalPercent") {
+      return percentagePoints.format(Number(difference) / 100) + " 个百分点";
+    }
+    return (difference > 0n ? "+" : "") + format(difference, kind);
+  }
+  if (Number.isFinite(reference) && Number.isFinite(current)) {
+    const difference = current - reference;
+    if (!Number.isFinite(difference)) return "—";
+    if (kind === "percent") return percentagePoints.format(difference * 100) + " 个百分点";
+    const unit = kind ?? "number";
+    const magnitude = format(Math.abs(difference), unit);
+    if (magnitude === format(0, unit)) return magnitude;
+    return (difference > 0 ? "+" : "−") + magnitude;
+  }
+  return reference === current ? "相同" : "不同";
+}
+
 function download(text, filename, type) {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const link = document.createElement("a");
@@ -109,6 +139,11 @@ function csvHeading({ title, exportTitle, format: kind }) {
   if (exportTitle) return exportTitle;
   const units = { percent: "比例", bps: "bp", millionCny: "元", cny: "元", usd: "USD" };
   return Object.hasOwn(units, kind) ? title + "（" + units[kind] + "）" : title;
+}
+
+function downloadCsv(rows, filename) {
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  download("\ufeff" + csv + "\r\n", filename, "text/csv;charset=utf-8");
 }
 
 function drawEdges(canvas, edges, positions, institution, radius) {
@@ -374,7 +409,7 @@ function init(app) {
     return filtered;
   }
 
-  function syncUrl() {
+  function analysisUrl() {
     const url = new URL(location.href);
     for (const key of ownedKeys) url.searchParams.delete(key);
     for (const [key, value] of state.filters) if (value) url.searchParams.set(key, value);
@@ -384,6 +419,12 @@ function init(app) {
     if (state.record && state.record !== app.initialRecord) url.searchParams.set("record", state.record);
     if (state.reference) url.searchParams.set("compare", state.reference.id);
     if (state.institution) url.searchParams.set("node", state.institution);
+    if (!state.reference && url.hash === "#comparison") url.hash = "detail";
+    return url;
+  }
+
+  function syncUrl() {
+    const url = analysisUrl();
     if (url.href === location.href) return;
     try {
       history.replaceState(history.state, "", url);
@@ -521,42 +562,59 @@ function init(app) {
     for (const section of app.related?.[record.related] ?? []) container.append(renderSection(section));
   }
 
+  function comparisonRows(reference, record) {
+    return app.columns.map(({ key, title, format: kind }) => {
+      const baseline = reference.values[key];
+      const current = record.values[key];
+      return [title, format(labels(key, baseline), kind), format(labels(key, current), kind),
+        formatDifference(baseline, current, kind)];
+    });
+  }
+
   function renderComparison(record) {
     const reference = state.reference;
     const panel = byId("comparison");
     const content = byId("comparison-content");
     const action = byId("pin-record");
+    const ready = Boolean(record && reference && record !== reference);
     action.disabled = !record || record === reference;
     byName("pin-record", record && record === reference ? "已设为对照" : "设为对照");
     panel.hidden = !reference;
+    byId("comparison-actions").hidden = !ready;
+    byName("share-status", "");
     if (!reference) {
       content.replaceChildren();
       return;
     }
-    const name = node("p", "reference-name", reference.title);
-    if (!record || record === reference) {
-      content.replaceChildren(name, node("p", "comparison-hint", "选择另一条记录查看差异。"));
+    const pair = node("dl", "comparison-pair");
+    const items = ready ? [["对照", reference], ["当前", record]] : [["对照", reference]];
+    for (const [label, entry] of items) {
+      const card = node("div", "comparison-identity");
+      card.append(node("dt", null, label), node("dd", null, entry.title));
+      pair.append(card);
+    }
+    if (!ready) {
+      content.replaceChildren(pair, node("p", "comparison-hint", "选择另一条记录查看差异。"));
       return;
     }
     const table = node("table");
     table.setAttribute("aria-label", "对照记录与当前记录的主要指标");
     const head = table.createTHead().insertRow();
-    for (const title of ["指标", "对照", "当前"]) {
+    for (const title of ["指标", "对照", "当前", "变化"]) {
       const cell = node("th", null, title);
       cell.scope = "col";
       head.append(cell);
     }
     const body = table.createTBody();
-    for (const { key, title, format: kind } of app.columns) {
+    for (const [title, baseline, current, difference] of comparisonRows(reference, record)) {
       const row = body.insertRow();
       const label = node("th", null, title);
       label.scope = "row";
-      row.append(label);
-      for (const entry of [reference, record]) {
-        row.append(node("td", null, format(labels(key, entry.values[key]), kind)));
-      }
+      row.append(label, node("td", null, baseline), node("td", null, current),
+        node("td", "comparison-change", difference));
     }
-    content.replaceChildren(name, table);
+    content.replaceChildren(pair, table, node("p", "comparison-hint",
+      "变化以原值计算，等于当前减对照。百分比差值以百分点显示。"));
   }
 
   function refresh() {
@@ -729,6 +787,31 @@ function init(app) {
     syncUrl();
   });
 
+  const shareDialog = byId("share-dialog");
+  const shareField = byId("share-url");
+  const shareButton = byId("share-comparison");
+  shareButton.hidden = !/^https?:$/u.test(location.protocol);
+  shareButton.addEventListener("click", async () => {
+    const url = analysisUrl();
+    url.hash = "comparison";
+    try {
+      await navigator.clipboard.writeText(url.href);
+      byName("share-status", "对照链接已复制");
+    } catch {
+      shareField.value = url.href;
+      if (!shareDialog.open) shareDialog.showModal();
+      shareField.focus();
+      shareField.select();
+    }
+  });
+  byId("export-comparison").addEventListener("click", () => {
+    const reference = state.reference;
+    const record = recordsById.get(state.record);
+    if (!reference || !record || record === reference) return;
+    const header = ["指标", "对照 · " + reference.title, "当前 · " + record.title, "变化"];
+    downloadCsv([header, ...comparisonRows(reference, record)], app.slug + "-comparison.csv");
+  });
+
   function changePage(offset) {
     const active = document.activeElement;
     state.page += offset;
@@ -745,8 +828,7 @@ function init(app) {
     const records = visibleRecords.map((record) => [
       record.title, ...app.columns.map(({ key }) => record.values[key]),
     ]);
-    const csv = [header, ...records].map((row) => row.map(csvCell).join(",")).join("\r\n");
-    download("\ufeff" + csv + "\r\n", app.slug + "-selection.csv", "text/csv;charset=utf-8");
+    downloadCsv([header, ...records], app.slug + "-selection.csv");
   });
   byId("download-record").addEventListener("click", () => {
     const record = recordsById.get(state.record);
@@ -760,6 +842,9 @@ function init(app) {
   });
   refresh();
   for (const id of ["hero-stat", "metrics", "workspace", "sources"]) byId(id).hidden = false;
+  if (location.hash === "#comparison" && state.reference) {
+    requestAnimationFrame(() => byId("comparison").scrollIntoView());
+  }
 }
 
 try {
