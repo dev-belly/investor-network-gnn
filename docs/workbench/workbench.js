@@ -431,7 +431,9 @@ function init(app) {
     if (state.query) url.searchParams.set("q", state.query);
     if (state.order) url.searchParams.set("sort", state.order);
     if (state.view) url.searchParams.set("view", app.views[state.view].id);
-    if (state.record && state.record !== app.initialRecord) url.searchParams.set("record", state.record);
+    if (state.record && (state.reference || state.record !== app.initialRecord)) {
+      url.searchParams.set("record", state.record);
+    }
     if (state.reference) url.searchParams.set("compare", state.reference.id);
     if (state.institution) url.searchParams.set("node", state.institution);
     if (!state.reference && url.hash === "#comparison") url.hash = "detail";
