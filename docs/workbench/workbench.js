@@ -355,6 +355,8 @@ function renderSection(section) {
 function init(app) {
   const parameters = new URLSearchParams(location.search);
   const recordsById = new Map(app.records.map((record) => [record.id, record]));
+  const askedRecord = parameters.get("record");
+  const askedReference = parameters.get("compare");
   const filtersByKey = new Map(app.filters.map((filter) => [filter.key, filter]));
   const labels = (key, value) => filtersByKey.get(key)?.labels?.[value] ?? value;
   const options = new Map(app.filters.map(({ key }) => [
@@ -378,8 +380,8 @@ function init(app) {
     filters: filterState,
     order: app.orders.some(({ id }) => id === parameters.get("sort")) ? parameters.get("sort") : "",
     view: app.views.findIndex(({ id }) => id === parameters.get("view")),
-    record: parameters.get("record") ?? app.initialRecord,
-    reference: recordsById.get(parameters.get("compare")) ?? null,
+    record: askedRecord ?? app.initialRecord,
+    reference: recordsById.get(askedReference) ?? null,
     institution: hasGraph ? parameters.get("node") ?? "" : "",
     page: 0,
   };
@@ -407,6 +409,19 @@ function init(app) {
       return direction * compareValues(a, b, order.format);
     });
     return filtered;
+  }
+
+  const linkNotices = [];
+  if (askedRecord !== null && !recordsById.has(askedRecord)) {
+    state.reference = null;
+    linkNotices.push("链接指定的记录已不可用，请重新选择记录后再对照。");
+  } else if (askedRecord !== null && !matching().some(({ id }) => id === askedRecord)) {
+    state.query = "";
+    for (const key of state.filters.keys()) state.filters.set(key, "");
+    linkNotices.push("已清除与链接冲突的筛选条件，保留链接指定的记录。");
+  }
+  if (askedReference !== null && !recordsById.has(askedReference)) {
+    linkNotices.push("链接指定的对照记录已不可用。");
   }
 
   function analysisUrl() {
@@ -792,12 +807,16 @@ function init(app) {
   const shareButton = byId("share-comparison");
   shareButton.hidden = !/^https?:$/u.test(location.protocol);
   shareButton.addEventListener("click", async () => {
+    const reference = state.reference;
+    const record = state.record;
+    const stillSelected = () => state.record === record && state.reference === reference;
     const url = analysisUrl();
     url.hash = "comparison";
     try {
       await navigator.clipboard.writeText(url.href);
-      byName("share-status", "对照链接已复制");
+      if (stillSelected()) byName("share-status", "对照链接已复制");
     } catch {
+      if (!stillSelected()) return;
       shareField.value = url.href;
       if (!shareDialog.open) shareDialog.showModal();
       shareField.focus();
@@ -810,6 +829,20 @@ function init(app) {
     if (!reference || !record || record === reference) return;
     const header = ["指标", "对照 · " + reference.title, "当前 · " + record.title, "变化"];
     downloadCsv([header, ...comparisonRows(reference, record)], app.slug + "-comparison.csv");
+  });
+  function evidence(record) {
+    return { record, related: app.related?.[record.related] ?? [] };
+  }
+
+  byId("export-evidence").addEventListener("click", () => {
+    const reference = state.reference;
+    const record = recordsById.get(state.record);
+    if (!reference || !record || record === reference) return;
+    const bundle = {
+      project: app.project, fields: app.columns, sources: app.sources,
+      reference: evidence(reference), current: evidence(record),
+    };
+    download(JSON.stringify(bundle, null, 2) + "\n", app.slug + "-comparison.json", "application/json");
   });
 
   function changePage(offset) {
@@ -834,13 +867,14 @@ function init(app) {
     const record = recordsById.get(state.record);
     if (!record) return;
     const data = {
-      project: app.project, sources: app.sources, record,
-      related: app.related?.[record.related] ?? [],
+      project: app.project, sources: app.sources, ...evidence(record),
     };
     const id = record.id.replace(/[^a-z0-9_-]+/gi, "-");
     download(JSON.stringify(data, null, 2) + "\n", app.slug + "-" + id + ".json", "application/json");
   });
   refresh();
+  byName("link-notice", linkNotices.join(" "));
+  byId("link-notice").hidden = linkNotices.length === 0;
   for (const id of ["hero-stat", "metrics", "workspace", "sources"]) byId(id).hidden = false;
   if (location.hash === "#comparison" && state.reference) {
     requestAnimationFrame(() => byId("comparison").scrollIntoView());
