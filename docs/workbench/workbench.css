@@ -376,6 +376,7 @@ td { font-variant-numeric: tabular-nums; }
   scrollbar-color: #b3c4ba transparent;
 }
 .detail .panel-heading { padding-bottom: .56rem; border-bottom: 1px solid var(--line); }
+.link-notice { margin-top: .75rem; padding: .65rem .75rem; border-left: 3px solid var(--accent); background: var(--accent-soft); color: var(--ink); font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
 .comparison {
   margin-top: .78rem;
   padding: clamp(.65rem, 1.45vw, 1rem);
