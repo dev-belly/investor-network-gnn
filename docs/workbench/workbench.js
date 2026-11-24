@@ -319,6 +319,7 @@ function renderSection(section) {
 
 function init(app) {
   const parameters = new URLSearchParams(location.search);
+  const recordsById = new Map(app.records.map((record) => [record.id, record]));
   const filtersByKey = new Map(app.filters.map((filter) => [filter.key, filter]));
   const labels = (key, value) => filtersByKey.get(key)?.labels?.[value] ?? value;
   const options = new Map(app.filters.map(({ key }) => [
@@ -330,7 +331,7 @@ function init(app) {
       ...Object.entries(record.values).flatMap(([key, value]) => [value, labels(key, value)])]
       .join(" ").normalize("NFKC").toLocaleLowerCase(),
   ]));
-  const ownedKeys = ["q", "sort", "view", "record", ...options.keys()];
+  const ownedKeys = ["q", "sort", "view", "record", "compare", ...options.keys()];
   const hasGraph = app.views.some(({ mode }) => mode === "graph");
   if (hasGraph) ownedKeys.push("node");
   const filterState = new Map(app.filters.map(({ key }) => {
@@ -343,6 +344,7 @@ function init(app) {
     order: app.orders.some(({ id }) => id === parameters.get("sort")) ? parameters.get("sort") : "",
     view: app.views.findIndex(({ id }) => id === parameters.get("view")),
     record: parameters.get("record") ?? app.initialRecord,
+    reference: recordsById.get(parameters.get("compare")) ?? null,
     institution: hasGraph ? parameters.get("node") ?? "" : "",
     page: 0,
   };
@@ -380,6 +382,7 @@ function init(app) {
     if (state.order) url.searchParams.set("sort", state.order);
     if (state.view) url.searchParams.set("view", app.views[state.view].id);
     if (state.record && state.record !== app.initialRecord) url.searchParams.set("record", state.record);
+    if (state.reference) url.searchParams.set("compare", state.reference.id);
     if (state.institution) url.searchParams.set("node", state.institution);
     if (url.href === location.href) return;
     try {
@@ -518,6 +521,44 @@ function init(app) {
     for (const section of app.related?.[record.related] ?? []) container.append(renderSection(section));
   }
 
+  function renderComparison(record) {
+    const reference = state.reference;
+    const panel = byId("comparison");
+    const content = byId("comparison-content");
+    const action = byId("pin-record");
+    action.disabled = !record || record === reference;
+    byName("pin-record", record && record === reference ? "已设为对照" : "设为对照");
+    panel.hidden = !reference;
+    if (!reference) {
+      content.replaceChildren();
+      return;
+    }
+    const name = node("p", "reference-name", reference.title);
+    if (!record || record === reference) {
+      content.replaceChildren(name, node("p", "comparison-hint", "选择另一条记录查看差异。"));
+      return;
+    }
+    const table = node("table");
+    table.setAttribute("aria-label", "对照记录与当前记录的主要指标");
+    const head = table.createTHead().insertRow();
+    for (const title of ["指标", "对照", "当前"]) {
+      const cell = node("th", null, title);
+      cell.scope = "col";
+      head.append(cell);
+    }
+    const body = table.createTBody();
+    for (const { key, title, format: kind } of app.columns) {
+      const row = body.insertRow();
+      const label = node("th", null, title);
+      label.scope = "row";
+      row.append(label);
+      for (const entry of [reference, record]) {
+        row.append(node("td", null, format(labels(key, entry.values[key]), kind)));
+      }
+    }
+    content.replaceChildren(name, table);
+  }
+
   function refresh() {
     visibleRecords = matching();
     const records = visibleRecords;
@@ -565,6 +606,7 @@ function init(app) {
       : "共 0 条");
     renderChart(records, record);
     renderDetail(record);
+    renderComparison(record);
     syncUrl();
   }
 
@@ -672,6 +714,20 @@ function init(app) {
     state.page = 0;
     refresh();
   });
+  byId("pin-record").addEventListener("click", () => {
+    const record = recordsById.get(state.record);
+    if (!record) return;
+    state.reference = record;
+    renderComparison(record);
+    byId("clear-comparison").focus({ preventScroll: true });
+    syncUrl();
+  });
+  byId("clear-comparison").addEventListener("click", () => {
+    state.reference = null;
+    renderComparison(recordsById.get(state.record));
+    (byId("pin-record").disabled ? search : byId("pin-record")).focus({ preventScroll: true });
+    syncUrl();
+  });
 
   function changePage(offset) {
     const active = document.activeElement;
@@ -693,7 +749,7 @@ function init(app) {
     download("\ufeff" + csv + "\r\n", app.slug + "-selection.csv", "text/csv;charset=utf-8");
   });
   byId("download-record").addEventListener("click", () => {
-    const record = app.records.find(({ id }) => id === state.record);
+    const record = recordsById.get(state.record);
     if (!record) return;
     const data = {
       project: app.project, sources: app.sources, record,

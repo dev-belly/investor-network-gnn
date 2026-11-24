@@ -91,9 +91,19 @@
       <section class="panel detail" id="detail" aria-labelledby="detail-heading" tabindex="-1">
         <div class="panel-heading">
           <h2 id="detail-heading"></h2>
-          <button class="text-button" id="download-record" type="button" disabled>导出 JSON</button>
+          <div class="panel-actions">
+            <button class="button" id="pin-record" type="button" disabled>设为对照</button>
+            <button class="text-button" id="download-record" type="button" disabled>导出 JSON</button>
+          </div>
         </div>
         <button class="text-button return-records" id="return-records" type="button">返回选中记录</button>
+        <section class="comparison" id="comparison" aria-labelledby="comparison-heading" hidden>
+          <div class="comparison-top">
+            <h3 id="comparison-heading">记录对照</h3>
+            <button class="text-button" id="clear-comparison" type="button">取消对照</button>
+          </div>
+          <div id="comparison-content"></div>
+        </section>
         <div id="record-detail"></div>
       </section>
     </div>
