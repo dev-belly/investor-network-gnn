@@ -389,6 +389,7 @@ function init(app) {
   let visibleRecords = [];
   let lastDetail = null;
   let disposeGraph = null;
+  let renderedSearch = location.search;
 
   function matching(skippedFilter) {
     const terms = state.query.normalize("NFKC").trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
@@ -445,11 +446,16 @@ function init(app) {
     if (url.href === location.href) return;
     try {
       history.replaceState(history.state, "", url);
+      renderedSearch = location.search;
     } catch (error) {
       if (error.name !== "SecurityError") throw error;
     }
   }
 
+  window.addEventListener("popstate", () => {
+    // Reopen the saved analysis when history changes the query, even within this document.
+    if (location.search !== renderedSearch) location.reload();
+  });
   function groupCounts(records, key) {
     const counts = new Map(options.get(key).map((value) => [value, 0]));
     for (const { values } of records) {
